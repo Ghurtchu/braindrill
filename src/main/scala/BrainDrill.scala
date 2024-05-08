@@ -24,9 +24,8 @@ object BrainDrill:
 
     val output = for
       process <- startProcess(cmd)
-      successFuture = readOutput(process.inputReader)
-      errorFuture = readOutput(process.errorReader)
-      ((success, error), exitCode) <- successFuture.zip(errorFuture).zip(Future(process.waitFor))
+      (success, error) = read(process.inputReader) -> read(process.errorReader)
+      ((success, error), exitCode) <- (success zip error) zip Future(process.waitFor)
     yield (success, error, exitCode)
 
     val (success, error, exitCode) = Await.result(output, 3.seconds)
@@ -35,12 +34,12 @@ object BrainDrill:
 
     exitCode match
       case 125 => println("Docker Engine is not running")
-      case _ => println(if success.nonEmpty then success else error)
+      case _   => println(if success.nonEmpty then success else error)
 
   private def startProcess(commands: Array[String]) =
     Future(Runtime.getRuntime.exec(commands))
 
-  private def readOutput(reader: BufferedReader) =
+  private def read(reader: BufferedReader) =
     Future:
       Using.resource(reader): reader =>
 
