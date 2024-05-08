@@ -32,7 +32,10 @@ object BrainDrill:
     val (success, error, exitCode) = Await.result(output, 3.seconds)
 
     println(s"ExitCode: $exitCode")
-    println(if success.nonEmpty then success else error)
+
+    exitCode match
+      case 125 => println("Docker Engine is not running")
+      case _ => println(if success.nonEmpty then success else error)
 
   private def startProcess(commands: Array[String]) =
     Future(Runtime.getRuntime.exec(commands))
