@@ -1,0 +1,7 @@
+[0m[[0m[33mwarn[0m] [0m[0m[33m[33m-- Warning: /Users/aghurtchumelia/Personal/exeCUTE/src/main/scala/Main.scala:36:9 [0m[0m[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m36 |[0m  Thread sleep [31m10000[0m[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m[33m   |[0m         ^^^^^[0m[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m   |[0mAlphanumeric method sleep is not declared [33minfix[0m; it should not be used as infix operator.[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m   |[0mInstead, use method syntax .sleep(...) or backticked identifier `sleep`.[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m   |[0mThe latter can be rewritten automatically under -rewrite -source 3.4-migration.[0m
+[0m[[0m[33mwarn[0m] [0m[0mone warning found[0m
