@@ -7,7 +7,7 @@ import scala.concurrent.duration._
 
 object BrainDrill:
 
-  def main(args: Array[String]): Unit =
+  def execute: Future[(String, String, Int)] =
 
     val cmd = Array(
       "docker",
@@ -22,19 +22,11 @@ object BrainDrill:
       "Python.py",
     )
 
-    val output = for
+    for
       process <- startProcess(cmd)
       (success, error) = read(process.inputReader) -> read(process.errorReader)
       ((success, error), exitCode) <- (success zip error) zip Future(process.waitFor)
     yield (success, error, exitCode)
-
-    val (success, error, exitCode) = Await.result(output, 3.seconds)
-
-    println(s"ExitCode: $exitCode")
-
-    exitCode match
-      case 125 => println("Docker Engine is not running")
-      case _   => println(if success.nonEmpty then success else error)
 
   private def startProcess(commands: Array[String]) =
     Future(Runtime.getRuntime.exec(commands))

@@ -5,6 +5,8 @@ import pekko.http.scaladsl.Http
 import pekko.http.scaladsl.model._
 import pekko.http.scaladsl.server.Directives._
 
+import scala.util._
+
 object HttpServer:
 
   def main(args: Array[String]): Unit =
@@ -18,7 +20,11 @@ object HttpServer:
     val route =
       path("hello"):
         get:
-          complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Say hello to Pekko HTTP</h1>"))
+          onComplete(BrainDrill.execute):
+            case Success((success, error, _)) =>
+              complete(200, if success.nonEmpty then success else error)
+            case Failure(reason) =>
+              complete(200, reason.toString)
 
     val binding = Http().newServerAt("localhost", 8080).bind(route)
 

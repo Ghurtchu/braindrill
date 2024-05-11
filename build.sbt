@@ -9,6 +9,8 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-http" % PekkoHttpVersion
 )
 
+libraryDependencies += "org.apache.pekko" %% "pekko-cluster-typed" % PekkoVersion
+
 lazy val root = (project in file("."))
   .settings(name := "exeCUTE")
 
