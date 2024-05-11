@@ -1,15 +1,13 @@
 package actors
 
 import CodeExecutor.Result.{Executed, UnsupportedLang}
-import FileCreator.In.CreateFile
 import Master.In
 import Master.In.ExecutionOutput
-import Master.Out.Response
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.pattern.*
 
-import java.io.{BufferedReader, File, PrintWriter}
+import java.io.{BufferedReader, File}
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.*
@@ -47,21 +45,22 @@ object CodeExecutor {
         import ctx.executionContext
 
         msg match
-          case In.Execute(commands, file, replyTo) => {
-            val asyncResult = for
-              // start docker container
-              ps <- startProcess(commands)
+          case In.Execute(commands, file, replyTo) =>
+            val asyncExecutionResult = for
+              // run docker container
+              ps <- execute(commands)
               // start reading error and success channels concurrently
               (success, error) = read(ps.inputReader) -> read(ps.errorReader)
               // join Futures of success, error and exitCode
               ((success, error), exitCode) <- success.zip(error).zip(Future(ps.waitFor))
+              // free up the memory
               _ = Future(file.delete)
             yield Result.Executed(
               output = if success.nonEmpty then success else error,
               exitCode = exitCode
             )
 
-            asyncResult.onComplete:
+            asyncExecutionResult.onComplete:
               case Success(Executed(output, _)) =>
                 replyTo ! Master.In.ExecutionOutput(output)
               case Success(UnsupportedLang(lang)) =>
@@ -70,14 +69,10 @@ object CodeExecutor {
                 replyTo ! Master.In.ExecutionFailed(t.toString)
 
             Behaviors.same
-          }
 
-
-  private def startProcess(commands: Array[String])(using ec: ExecutionContext) =
-    Future:
-      Runtime
-        .getRuntime
-        .exec(commands)
+  // starts the process in async way
+  private def execute(commands: Array[String])(using ec: ExecutionContext) =
+    Future(Runtime.getRuntime.exec(commands))
 
   // reads the full output from source in async way with resource-safety enabled
   private def read(reader: BufferedReader)(using ec: ExecutionContext) =

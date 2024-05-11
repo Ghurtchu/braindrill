@@ -18,7 +18,7 @@ object HttpServer:
 
   def main(args: Array[String]): Unit =
     // actor system - "master" for processing incoming http requests
-    implicit val master = ActorSystem( Master(), "master")
+    implicit val master = ActorSystem(Master(), "master")
     // 5 seconds timeout
     implicit val timeout: Timeout = Timeout(5.seconds)
     // execution context for running Future-s

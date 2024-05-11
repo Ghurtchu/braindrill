@@ -1,6 +1,6 @@
 package actors
 
-import FileCreator.In.CreateFile
+import FileCreator.Command.CreateFile
 import Master.In
 import Master.In.ExecutionOutput
 import Master.Out.Response
@@ -57,7 +57,7 @@ object Master {
             mappings.get(lang) match
               case Some(inputs) =>
                 ctx.log.info(s"sending CreateFile to $fileCreator")
-                fileCreator ! FileCreator.In.CreateFile(
+                fileCreator ! FileCreator.Command.CreateFile(
                   name = s"$lang${Random.nextLong}${inputs.extension}",
                   dockerImage = inputs.dockerImage,
                   compiler = inputs.compiler,
