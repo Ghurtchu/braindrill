@@ -22,7 +22,7 @@ object HttpServer:
 
     // HTTP route definition
     val route =
-      // send HTTP request at e.g http://execution-engine/lang/python
+      // send HTTP request at e.g http://braindrill.dev/lang/python
       pathPrefix("lang" / Segment): lang =>
         // handle POST request
         post:

@@ -55,11 +55,10 @@ object BrainDrill:
             )
           // start reading error and success channels concurrently
           (success, error) = read(ps.inputReader) -> read(ps.errorReader)
-          // join success, error and exitCode in a non- blocking way
+          // join Futures of success, error and exitCode
           ((success, error), exitCode) <- success.zip(error).zip(Future(ps.waitFor))
-          // remove the file since it's not needed
+          // remove the file to free up the memory
           _ <- Future(file.delete())
-          // return the execution result
         yield Result.Executed(
           output = if success.nonEmpty then success else error,
           exitCode = exitCode
