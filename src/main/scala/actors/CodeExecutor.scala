@@ -1,8 +1,8 @@
 package actors
 
-import CodeExecutor.Result.{Executed, UnsupportedLang}
 import Master.In
-import Master.In.ExecutionOutput
+import Master.In.ExecutionSucceeded
+import actors.CodeExecutor.Out.Executed
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.pattern.*
@@ -12,11 +12,14 @@ import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.*
 
-object CodeExecutor {
+object CodeExecutor:
 
-  enum Result:
+  enum In:
+    case Execute(commands: Array[String], file: File, replyTo: ActorRef[Master.In])
+
+  enum Out:
     case Executed(output: String, exitCode: Int)
-    case UnsupportedLang(lang: String)
+
 
   // simple model for grouping inputs to execute code inside container
   private case class ExecutionInputs(dockerImage: String, compiler: String, extension: String)
@@ -35,13 +38,7 @@ object CodeExecutor {
       )
     )
 
-  enum In:
-    case Execute(commands: Array[String], file: File, replyTo: ActorRef[Master.In])
-
-  def apply(): Behavior[In] =
-    Behaviors.receive[In]:
-      (ctx, msg) =>
-
+  def apply() = Behaviors.receive[In]: (ctx, msg) =>
         import ctx.executionContext
 
         msg match
@@ -55,20 +52,18 @@ object CodeExecutor {
               ((success, error), exitCode) <- success.zip(error).zip(Future(ps.waitFor))
               // free up the memory
               _ = Future(file.delete)
-            yield Result.Executed(
+            yield Out.Executed(
               output = if success.nonEmpty then success else error,
               exitCode = exitCode
             )
 
             asyncExecutionResult.onComplete:
-              case Success(Executed(output, _)) =>
-                replyTo ! Master.In.ExecutionOutput(output)
-              case Success(UnsupportedLang(lang)) =>
-                replyTo ! Master.In.ExecutionOutput(s"unsupported lang: $lang")
+              case Success(Out.Executed(output, _)) =>
+                replyTo ! Master.In.ExecutionSucceeded(output)
               case Failure(t) =>
                 replyTo ! Master.In.ExecutionFailed(t.toString)
 
-            Behaviors.same
+            Behaviors.stopped
 
   // starts the process in async way
   private def execute(commands: Array[String])(using ec: ExecutionContext) =
@@ -92,5 +87,4 @@ object CodeExecutor {
     Try(reader.readLine)
       .toOption
       .filter(line => line != null && line.nonEmpty)
-}
 

@@ -1,6 +1,6 @@
 package actors
 
-import FileCreator.Command.CreateFile
+import FileCreator.In.CreateFile
 import Master.In
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -12,7 +12,7 @@ import scala.util.*
 
 object FileCreator:
 
-  enum Command:
+  enum In:
     case CreateFile(
       name: String,
       code: String,
@@ -21,11 +21,11 @@ object FileCreator:
       replyTo: ActorRef[Master.In]
     )
 
-  def apply() = Behaviors.receive[Command]: (ctx, msg) =>
+  def apply() = Behaviors.receive[In]: (ctx, msg) =>
     import ctx.executionContext
 
     msg match
-      case Command.CreateFile(name, code, dockerImage, compiler, replyTo) =>
+      case In.CreateFile(name, code, dockerImage, compiler, replyTo) =>
         val asyncFile = for
           file <- Future(File(name))
           _    <- Future(Using.resource(PrintWriter(name))(_.write(code)))
@@ -39,4 +39,4 @@ object FileCreator:
             replyTo = replyTo
           )
 
-    Behaviors.same
+      Behaviors.stopped

@@ -1,45 +1,45 @@
 import actors.Master
-import actors.Master.Out
+import actors.Master.Out.ExecutionResponse
+import actors.Master.In.InitiateExecution
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.http.scaladsl.Http
-import pekko.http.scaladsl.model.*
 import pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.util.Timeout
 import pekko.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
 import pekko.actor.typed.scaladsl.AskPattern.Askable
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.*
-import scala.util.*
 
 object HttpServer:
 
   def main(args: Array[String]): Unit =
-    // actor system - "master" for processing incoming http requests
-    implicit val master = ActorSystem(Master(), "master")
-    // 5 seconds timeout
+    // master actor
+    implicit val master = ActorSystem(Master(), "braindrill")
+    // 5 seconds timeout for ask pattern
     implicit val timeout: Timeout = Timeout(5.seconds)
-    // execution context for running Future-s
+    // execution context for Future-s
     given ec: ExecutionContextExecutor = master.executionContext
-    // actors logger
+
     import master.log
 
     // HTTP route definition
-    val route: Route =
+    val route =
       // send HTTP request at e.g http://braindrill.dev/lang/python
       pathPrefix("lang" / Segment): lang =>
         // handle POST request
         post:
           // read source code from the request body
           entity(as[String]): code =>
-            complete:
-              master
-                .ask(replyTo => Master.In.StartExecution(code, lang, replyTo))
-                .mapTo[Master.Out]
-                .map { case Out.Response(result) => result }
-                .recover(_ => "something went wrong")
+              val asyncExecutionResponse = master // ask master
+                .ask[Master.Out](InitiateExecution(code, lang, _)) // to initiate code execution task task
+                .mapTo[ExecutionResponse] // then map the result to ExecutionResponse
+                .map(_.output) // and finally take "output" field
+                .recover(_ => "something went wrong") // TODO: make better recovery
+
+              complete(asyncExecutionResponse)
 
     // run HTTP server and start accepting requests
     Http()
