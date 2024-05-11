@@ -3,9 +3,8 @@ package actors
 import Master.In
 import Master.In.ExecutionSucceeded
 import actors.CodeExecutor.Out.Executed
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.pattern.*
 
 import java.io.{BufferedReader, File}
 import scala.annotation.tailrec
@@ -14,16 +13,18 @@ import scala.util.*
 
 object CodeExecutor:
 
+  // incoming messages
   enum In:
     case Execute(commands: Array[String], file: File, replyTo: ActorRef[Master.In])
 
+  // outgoing messages
   enum Out:
     case Executed(output: String, exitCode: Int)
-
 
   // simple model for grouping inputs to execute code inside container
   private case class ExecutionInputs(dockerImage: String, compiler: String, extension: String)
 
+  // mapping language to its ExecutionInputs
   private val mappings: Map[String, ExecutionInputs] =
     Map(
       "python" -> ExecutionInputs(
@@ -39,31 +40,37 @@ object CodeExecutor:
     )
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
-        import ctx.executionContext
+    import ctx.executionContext
 
-        msg match
-          case In.Execute(commands, file, replyTo) =>
-            val asyncExecutionResult = for
-              // run docker container
-              ps <- execute(commands)
-              // start reading error and success channels concurrently
-              (success, error) = read(ps.inputReader) -> read(ps.errorReader)
-              // join Futures of success, error and exitCode
-              ((success, error), exitCode) <- success.zip(error).zip(Future(ps.waitFor))
-              // free up the memory
-              _ = Future(file.delete)
-            yield Out.Executed(
-              output = if success.nonEmpty then success else error,
-              exitCode = exitCode
-            )
+    msg match
+      case In.Execute(commands, file, replyTo) =>
+        val asyncExecutionResult = for
+          // run docker container
+          ps <- execute(commands)
+          // start reading error and success channels concurrently
+          (asyncSuccess, asyncError) = read(ps.inputReader) -> read(ps.errorReader)
+          // join Futures of success, error and exitCode
+          ((success, error), exitCode) <- asyncSuccess.zip(asyncError).zip(Future(ps.waitFor))
+          // free up the memory
+          _ = Future(file.delete)
+        yield Out.Executed(
+          output = if success.nonEmpty then success else error,
+          exitCode = exitCode
+        )
 
-            asyncExecutionResult.onComplete:
-              case Success(Out.Executed(output, _)) =>
-                replyTo ! Master.In.ExecutionSucceeded(output)
-              case Failure(t) =>
-                replyTo ! Master.In.ExecutionFailed(t.toString)
+        // once finished
+        asyncExecutionResult.onComplete:
+          // if succeeds
+          case Success(Out.Executed(output, _)) =>
+            // reply ExecutionSucceeded to Master
+            replyTo ! Master.In.ExecutionSucceeded(output)
+          // if fails
+          case Failure(t) =>
+            // reply ExecutionFailed to Master
+            replyTo ! Master.In.ExecutionFailed(t.toString)
 
-            Behaviors.stopped
+        // stop the actor, free up the memory
+        Behaviors.stopped
 
   // starts the process in async way
   private def execute(commands: Array[String])(using ec: ExecutionContext) =

@@ -1,5 +1,5 @@
 import actors.Master
-import actors.Master.Out.ExecutionResponse
+import actors.Master.ExecutionResponse
 import actors.Master.In.InitiateExecution
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
@@ -34,8 +34,7 @@ object HttpServer:
           // read source code from the request body
           entity(as[String]): code =>
               val asyncExecutionResponse = master // ask master
-                .ask[Master.Out](InitiateExecution(code, lang, _)) // to initiate code execution task task
-                .mapTo[ExecutionResponse] // then map the result to ExecutionResponse
+                .ask[ExecutionResponse](InitiateExecution(code, lang, _)) // to initiate code execution task
                 .map(_.output) // and finally take "output" field
                 .recover(_ => "something went wrong") // TODO: make better recovery
 

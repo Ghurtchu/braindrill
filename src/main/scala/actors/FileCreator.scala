@@ -12,6 +12,7 @@ import scala.util.*
 
 object FileCreator:
 
+  // incoming messages
   enum In:
     case CreateFile(
       name: String,
@@ -27,11 +28,15 @@ object FileCreator:
     msg match
       case In.CreateFile(name, code, dockerImage, compiler, replyTo) =>
         val asyncFile = for
+          // create file
           file <- Future(File(name))
+          // put code inside file with resource-safety enabled
           _    <- Future(Using.resource(PrintWriter(name))(_.write(code)))
         yield file
 
+        // once finished
         asyncFile.foreach: file =>
+          // reply FileCreated to Master actor
           replyTo ! Master.In.FileCreated(
             file = file,
             dockerImage = dockerImage,
@@ -39,4 +44,5 @@ object FileCreator:
             replyTo = replyTo
           )
 
+      // stop the actor, free up the memory
       Behaviors.stopped
