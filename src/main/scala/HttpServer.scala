@@ -12,7 +12,6 @@ import scala.util._
 object HttpServer:
 
   def main(args: Array[String]): Unit =
-
     // actor system - "master" for processing incoming http requests
     implicit val actorSystem = ActorSystem(Behaviors.empty, "master")
     // execution context for running Future-s

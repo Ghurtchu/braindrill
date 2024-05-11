@@ -57,8 +57,8 @@ object BrainDrill:
           (success, error) = read(ps.inputReader) -> read(ps.errorReader)
           // join Futures of success, error and exitCode
           ((success, error), exitCode) <- success.zip(error).zip(Future(ps.waitFor))
-          // remove the file to free up the memory
-          _ <- Future(file.delete())
+          // remove the file in the background to free up the memory
+          _ = Future(file.delete())
         yield Result.Executed(
           output = if success.nonEmpty then success else error,
           exitCode = exitCode
