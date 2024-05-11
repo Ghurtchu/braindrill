@@ -1,7 +1,7 @@
 package actors
 
 import FileCreator.In.CreateFile
-import Master.In
+import BrainDrill.In
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
@@ -19,7 +19,7 @@ object FileCreator:
       code: String,
       dockerImage: String,
       compiler: String,
-      replyTo: ActorRef[Master.In]
+      replyTo: ActorRef[BrainDrill.In]
     )
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
@@ -37,7 +37,7 @@ object FileCreator:
         // once finished
         asyncFile.foreach: file =>
           // reply FileCreated to Master actor
-          replyTo ! Master.In.FileCreated(
+          replyTo ! BrainDrill.In.FileCreated(
             file = file,
             dockerImage = dockerImage,
             compiler = compiler,

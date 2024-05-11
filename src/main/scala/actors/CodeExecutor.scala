@@ -1,7 +1,7 @@
 package actors
 
-import Master.In
-import Master.In.ExecutionSucceeded
+import BrainDrill.In
+import BrainDrill.In.ExecutionSucceeded
 import actors.CodeExecutor.Out.Executed
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -15,7 +15,7 @@ object CodeExecutor:
 
   // incoming messages
   enum In:
-    case Execute(commands: Array[String], file: File, replyTo: ActorRef[Master.In])
+    case Execute(commands: Array[String], file: File, replyTo: ActorRef[BrainDrill.In])
 
   // outgoing messages
   enum Out:
@@ -63,11 +63,11 @@ object CodeExecutor:
           // if succeeds
           case Success(Out.Executed(output, _)) =>
             // reply ExecutionSucceeded to Master
-            replyTo ! Master.In.ExecutionSucceeded(output)
+            replyTo ! BrainDrill.In.ExecutionSucceeded(output)
           // if fails
           case Failure(t) =>
             // reply ExecutionFailed to Master
-            replyTo ! Master.In.ExecutionFailed(t.toString)
+            replyTo ! BrainDrill.In.ExecutionFailed(t.toString)
 
         // stop the actor, free up the memory
         Behaviors.stopped

@@ -1,6 +1,6 @@
-import actors.Master
-import actors.Master.ExecutionResponse
-import actors.Master.In.InitiateExecution
+import actors.BrainDrill
+import actors.BrainDrill.ExecutionResponse
+import actors.BrainDrill.In.InitiateExecution
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.http.scaladsl.Http
@@ -16,14 +16,12 @@ import scala.concurrent.duration.*
 object HttpServer:
 
   def main(args: Array[String]): Unit =
-    // master actor
-    implicit val master = ActorSystem(Master(), "braindrill")
+    // top level actor - /user/braindrill
+    given brainDrill: ActorSystem[BrainDrill.In] = ActorSystem(BrainDrill(), "braindrill")
     // 5 seconds timeout for ask pattern
-    implicit val timeout: Timeout = Timeout(5.seconds)
+    given timeout: Timeout = Timeout(5.seconds)
     // execution context for Future-s
-    given ec: ExecutionContextExecutor = master.executionContext
-
-    import master.log
+    given ec: ExecutionContextExecutor = brainDrill.executionContext
 
     // HTTP route definition
     val route =
@@ -33,7 +31,7 @@ object HttpServer:
         post:
           // read source code from the request body
           entity(as[String]): code =>
-              val asyncExecutionResponse = master // ask master
+              val asyncExecutionResponse = brainDrill // ask master
                 .ask[ExecutionResponse](InitiateExecution(code, lang, _)) // to initiate code execution task
                 .map(_.output) // and finally take "output" field
                 .recover(_ => "something went wrong") // TODO: make better recovery
@@ -44,4 +42,4 @@ object HttpServer:
     Http()
       .newServerAt("localhost", 8080)
       .bind(route)
-      .foreach(_ => log.info(s"Server now online. Please navigate to http://localhost:8080/hello\nPress RETURN to stop..."))
+      .foreach(_ => brainDrill.log.info(s"Server now online. Please navigate to http://localhost:8080/hello\nPress RETURN to stop..."))

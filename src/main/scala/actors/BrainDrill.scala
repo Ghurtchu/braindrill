@@ -1,23 +1,28 @@
 package actors
 
 import FileCreator.In.CreateFile
-import Master.In
-import Master.In.ExecutionSucceeded
+import BrainDrill.In
+import BrainDrill.In.ExecutionSucceeded
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 import java.io.File
 import scala.util.*
 
-// This actor never terminates as it acts as a load balancer for worker actors
-object Master {
+/**
+ * BrainDrill is a master actor
+ * BrainDrill never terminates as it acts as:
+ * - top level actor
+ * - load balancer between worker actors (FileCreator and CodeExecutor)
+ */
+object BrainDrill {
 
   // incoming messages
   enum In:
     // command from http layer
     case InitiateExecution(code: String, language: String, replyTo: ActorRef[ExecutionResponse])
     // response from FileCreator actor
-    case FileCreated(file: File, dockerImage: String, compiler: String, replyTo: ActorRef[Master.In])
+    case FileCreated(file: File, dockerImage: String, compiler: String, replyTo: ActorRef[BrainDrill.In])
     // response-1 from CodeExecutor actor
     case ExecutionSucceeded(result: String)
     // response-2 from CodeExecutor actor
