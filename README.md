@@ -11,6 +11,7 @@ TODO:
 - introduce local master and worker pekko actors - ✅
 - create master actor (load balancer, pekko-http) - ❌
 - create pekko cluster of nodes (one node / actor system per programming language) - ❌
+- enable cluster aware routing (consistent hashing / round robin) - ❌
 - make worker actors sharded on each node (e.g 100 actors on each node, awaiting tasks) - ❌
 - introduce redundancy for each actor system (let's say 2 nodes or jvm-s per language) - ❌
 
