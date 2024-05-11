@@ -1,46 +1,45 @@
+import actors.Master
+import actors.Master.Out
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
-import pekko.actor.typed.scaladsl.Behaviors
 import pekko.http.scaladsl.Http
-import pekko.http.scaladsl.model._
-import pekko.http.scaladsl.server.Directives._
+import pekko.http.scaladsl.model.*
+import pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.util.Timeout
+import pekko.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
+import pekko.actor.typed.scaladsl.AskPattern.Askable
 
-import BrainDrill.Result._
-
-import scala.util._
+import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.duration.*
+import scala.util.*
 
 object HttpServer:
 
   def main(args: Array[String]): Unit =
     // actor system - "master" for processing incoming http requests
-    implicit val actorSystem = ActorSystem(Behaviors.empty, "master")
+    implicit val master = ActorSystem( Master(), "master")
+    // 5 seconds timeout
+    implicit val timeout: Timeout = Timeout(5.seconds)
     // execution context for running Future-s
-    implicit val executionContext = actorSystem.executionContext
+    given ec: ExecutionContextExecutor = master.executionContext
     // actors logger
-    import actorSystem.log
+    import master.log
 
     // HTTP route definition
-    val route =
+    val route: Route =
       // send HTTP request at e.g http://braindrill.dev/lang/python
       pathPrefix("lang" / Segment): lang =>
         // handle POST request
         post:
           // read source code from the request body
           entity(as[String]): code =>
-            // start executing code
-            val drill = BrainDrill.runAsync(lang, code)
-            // register callback for responding back to HTTP request
-            onComplete(drill):
-              case Success(Executed(output, _)) =>
-                // send back the output from the process
-                complete(200, output)
-              case Success(UnsupportedLang(lang)) =>
-                // notify user that the lang is unsupported
-                complete(200, s"$lang is unsupported")
-              case Failure(reason) =>
-                // TODO: make fine grained message in case failures
-                complete(500, "Something went wrong")
-
+            complete:
+              master
+                .ask(replyTo => Master.In.StartExecution(code, lang, replyTo))
+                .mapTo[Master.Out]
+                .map { case Out.Response(result) => result }
+                .recover(_ => "something went wrong")
 
     // run HTTP server and start accepting requests
     Http()
