@@ -6,7 +6,9 @@ The goal of the project is to gain some practical experience using Pekko Cluster
 
 TODO:
 - implement POC - ✅
-- introduce pekko actors - ❌
+- introduce http layer (pekko-http) - ✅
+- add support for a few programming languages - ✅
+- introduce worker pekko actors / nodes - ❌
 - create master actor (load balancer, pekko-http) - ❌
 - create pekko cluster of nodes (one node / actor system per programming language) - ❌
 - make worker actors sharded on each node (e.g 100 actors on each node, awaiting tasks) - ❌
