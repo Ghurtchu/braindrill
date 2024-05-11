@@ -11,12 +11,12 @@ object BrainDrill:
   // simple model for execution result
   enum Result:
     case Executed(output: String, exitCode: Int)
-    case UnsupportedLanguage(lang: String)
+    case UnsupportedLang(lang: String)
 
   // simple model for grouping inputs to execute code inside container
   private case class ExecutionInputs(dockerImage: String, compiler: String, extension: String)
 
-  // maps language to docker image, compiler/interpreter and file extension
+  // maps language to its ExecutionInputs
   private val mappings: Map[String, ExecutionInputs] =
     Map(
       "python" -> ExecutionInputs(
@@ -31,31 +31,28 @@ object BrainDrill:
       )
     )
 
-  // runs code in docker container, async
+  // attempts to run code in docker container in async and non-blocking way
   def runAsync(lang: String, code: String): Future[Result] =
     mappings get lang match
-      case None => Future.successful(Result.UnsupportedLanguage(lang))
+      case None => Future.successful(Result.UnsupportedLang(lang))
       case Some(input) =>
-        // takes file name and builds command array for running docker container
-        val cmd: String => Array[String] = file => Array(
-          "docker",
-          "run",
-          "--rm",
-          "-v",
-          s"${System.getProperty("user.dir")}:/app",
-          "-w",
-          "/app",
-          s"${input.dockerImage}",
-          s"${input.compiler}",
-          s"$file",
-        )
-
-        // fully async and non-blocking process
         for
           // create a file and write user code to it
           file <- file(s"$lang${input.extension}", code)
           // start docker container
-          ps <- startProcess(cmd(file.getName))
+          ps <- startProcess:
+            Array(
+              "docker",
+              "run",
+              "--rm", // remove container after it's done
+              "-v",
+              s"${System.getProperty("user.dir")}:/app",
+              "-w",
+              "/app",
+              s"${input.dockerImage}",
+              s"${input.compiler}", // e.g scala
+              s"$file", // e.g Main.scala
+            )
           // start reading error and success channels concurrently
           (success, error) = read(ps.inputReader) -> read(ps.errorReader)
           // join success, error and exitCode in a non- blocking way

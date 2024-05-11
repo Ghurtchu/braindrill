@@ -35,7 +35,7 @@ object HttpServer:
               case Success(Executed(output, _)) =>
                 // send back the output from the process
                 complete(200, output)
-              case Success(UnsupportedLanguage(lang)) =>
+              case Success(UnsupportedLang(lang)) =>
                 // notify user that the lang is unsupported
                 complete(200, s"$lang is unsupported")
               case Failure(reason) =>
