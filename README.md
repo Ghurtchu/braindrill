@@ -9,8 +9,9 @@ TODO:
 - introduce http layer (pekko-http) - ✅
 - add support for a few programming languages - ✅
 - introduce local master and worker pekko actors - ✅
-- create master actor (load balancer, pekko-http) - ❌
-- create pekko cluster of worker nodes (let's say 3) - ❌
+- introduce Pekko Cluster - ❌
+- turn local master actor into load balancer node - ❌
+- create 3 worker nodes and enable autoscaling - ❌
 - enable `RoundRobin` load balancing - ❌
 - make worker actors sharded on each node (e.g 100 actors on each node, awaiting tasks) - ❌
 
