@@ -8,7 +8,7 @@ TODO:
 - implement POC - ✅
 - introduce http layer (pekko-http) - ✅
 - add support for a few programming languages - ✅
-- introduce worker pekko actors / nodes - ❌
+- introduce local master and worker pekko actors - ✅
 - create master actor (load balancer, pekko-http) - ❌
 - create pekko cluster of nodes (one node / actor system per programming language) - ❌
 - make worker actors sharded on each node (e.g 100 actors on each node, awaiting tasks) - ❌
