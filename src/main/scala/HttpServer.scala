@@ -42,4 +42,4 @@ object HttpServer:
     Http()
       .newServerAt("localhost", 8080)
       .bind(route)
-      .foreach(_ => brainDrill.log.info(s"Server now online. Please navigate to http://localhost:8080/hello\nPress RETURN to stop..."))
+      .foreach(_ => brainDrill.log.info(s"Server now online"))

@@ -52,55 +52,65 @@ object BrainDrill {
     lazy val setInitiator: ActorRef[ExecutionResponse] => Behavior[In] = sender => apply(Some(sender))
     lazy val unchanged = Behaviors.same[In]
 
-    Behaviors.receive[In]:
-      (ctx, msg) =>
-        msg match
-          case In.InitiateExecution(code, lang, replyTo) =>
-            val fileCreator = ctx.spawn(
-              behavior = FileCreator(),
-              name = s"file-creator-${Random.nextLong}"
-            )
-            mappings.get(lang) match
-              case Some(inputs) =>
-                ctx.log.info(s"sending CreateFile to $fileCreator")
-                fileCreator ! FileCreator.In.CreateFile(
-                  name = s"$lang${Random.nextLong}${inputs.extension}",
-                  dockerImage = inputs.dockerImage,
-                  compiler = inputs.compiler,
-                  code = code,
-                  replyTo = ctx.self
-                )
-              case None => replyTo ! ExecutionResponse(s"unsupported language: $lang")
+    Behaviors.setup[In]: ctx =>
+      ctx.log.info(s"${ctx.self} started")
 
-            setInitiator(replyTo)
+      Behaviors.receive[In]:
+        (ctx, msg) =>
+          msg match
+            case msg @ In.InitiateExecution(code, lang, replyTo) =>
+              ctx.log.info(s"processing $msg")
+              val fileCreator = ctx.spawn(
+                behavior = FileCreator(),
+                name = s"file-creator-${Random.nextLong}"
+              )
+              mappings.get(lang) match
+                case Some(inputs) =>
+                  ctx.log.info(s"sending CreateFile to $fileCreator")
+                  fileCreator ! FileCreator.In.CreateFile(
+                    name = s"$lang${Random.nextLong}${inputs.extension}",
+                    dockerImage = inputs.dockerImage,
+                    compiler = inputs.compiler,
+                    code = code,
+                    replyTo = ctx.self
+                  )
+                case None =>
+                  val warning = s"unsupported language: $lang"
+                  ctx.log.warn(warning)
+                  replyTo ! ExecutionResponse(warning)
 
-          case msg: In.FileCreated =>
-            ctx.log.info(s"received $msg")
-            val codeExecutor = ctx.spawn(
-              behavior = CodeExecutor(),
-              name = s"code-executor-${Random.nextLong}"
-            )
-            val commands = Array(
-              "docker",
-              "run",
-              "--rm", // remove container after it's done
-              "-v",
-              s"${System.getProperty("user.dir")}:/app",
-              "-w",
-              "/app",
-              s"${msg.dockerImage}",
-              s"${msg.compiler}", // e.g scala
-              s"${msg.file.getName}", // e.g Main.scala
-            )
-            codeExecutor ! CodeExecutor.In.Execute(commands, msg.file, msg.replyTo)
-            unchanged
+              setInitiator(replyTo)
 
-          case In.ExecutionSucceeded(result) =>
-            initiator.foreach(_ ! ExecutionResponse(result))
-            clearState
+            case msg: In.FileCreated =>
+              ctx.log.info(s"received $msg")
+              val codeExecutor = ctx.spawn(
+                behavior = CodeExecutor(),
+                name = s"code-executor-${Random.nextLong}"
+              )
+              val commands = Array(
+                "docker",
+                "run",
+                "--rm", // remove container after it's done
+                "-v",
+                s"${System.getProperty("user.dir")}:/app",
+                "-w",
+                "/app",
+                s"${msg.dockerImage}",
+                s"${msg.compiler}", // e.g scala
+                s"${msg.file.getName}", // e.g Main.scala
+              )
+              ctx.log.info(s"sending Execute to $codeExecutor")
+              codeExecutor ! CodeExecutor.In.Execute(commands, msg.file, msg.replyTo)
+              unchanged
 
-          case In.ExecutionFailed(reason) =>
-            initiator.foreach(_ ! ExecutionResponse(s"execution failed due to: $reason"))
-            clearState
+            case In.ExecutionSucceeded(result) =>
+              ctx.log.info("responding to initiator with successful ExecutionResponse")
+              initiator.foreach(_ ! ExecutionResponse(result))
+              clearState
+
+            case In.ExecutionFailed(reason) =>
+              ctx.log.info("responding to initiator with failed ExecutionResponse")
+              initiator.foreach(_ ! ExecutionResponse(s"execution failed due to: $reason"))
+              clearState
 }
 

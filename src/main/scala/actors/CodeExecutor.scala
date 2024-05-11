@@ -44,6 +44,7 @@ object CodeExecutor:
 
     msg match
       case In.Execute(commands, file, replyTo) =>
+        ctx.log.info("executing code")
         val asyncExecutionResult = for
           // run docker container
           ps <- execute(commands)
@@ -62,13 +63,12 @@ object CodeExecutor:
         asyncExecutionResult.onComplete:
           // if succeeds
           case Success(Out.Executed(output, _)) =>
-            // reply ExecutionSucceeded to Master
             replyTo ! BrainDrill.In.ExecutionSucceeded(output)
           // if fails
           case Failure(t) =>
-            // reply ExecutionFailed to Master
             replyTo ! BrainDrill.In.ExecutionFailed(t.toString)
 
+        ctx.log.info(s"stopping ${ctx.self}")
         // stop the actor, free up the memory
         Behaviors.stopped
 

@@ -27,6 +27,7 @@ object FileCreator:
 
     msg match
       case In.CreateFile(name, code, dockerImage, compiler, replyTo) =>
+        ctx.log.info("processing CreateFile")
         val asyncFile = for
           // create file
           file <- Future(File(name))
@@ -44,5 +45,6 @@ object FileCreator:
             replyTo = replyTo
           )
 
+      ctx.log.info(s"stopping ${ctx.self}")
       // stop the actor, free up the memory
       Behaviors.stopped
