@@ -13,7 +13,7 @@ import pekko.actor.typed.scaladsl.AskPattern.Askable
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.*
 
-object HttpServer:
+object Main:
 
   def main(args: Array[String]): Unit =
     // top level actor - /user/braindrill
