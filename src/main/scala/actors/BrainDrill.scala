@@ -3,13 +3,19 @@ package actors
 import FileHandler.In.PrepareFile
 import BrainDrill.In
 import BrainDrill.In.TaskSucceeded
+import org.apache.pekko.actor.typed.receptionist.ServiceKey
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 import java.io.File
 import scala.util.*
 
+/**
+ * Root actor: assigning tasks to children and responding back to http layer
+ */
 object BrainDrill:
+
+  val WorkerServiceKey = ServiceKey[BrainDrill.In.AssignTask]("Worker")
 
   enum In:
     case AssignTask(code: String, language: String, replyTo: ActorRef[TaskResult])
@@ -34,19 +40,19 @@ object BrainDrill:
       )
     )
 
-  def apply(initiator: Option[ActorRef[TaskResult]] = None): Behavior[In] =
+  def apply(requester: Option[ActorRef[TaskResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
       ctx.log.info(s"${ctx.self} started")
 
       Behaviors.receiveMessage[In]:
         case msg @ In.AssignTask(code, lang, replyTo) =>
           ctx.log.info(s"processing $msg")
-          val fileHandler = ctx.spawn(
-            behavior = FileHandler(),
-            name = s"file-handler"
-          )
           mappings.get(lang) match
             case Some(inputs) =>
+              val fileHandler = ctx.spawn(
+                behavior = FileHandler(),
+                name = s"file-handler"
+              )
               ctx.log.info(s"sending PrepareFile to $fileHandler")
               fileHandler ! FileHandler.In.PrepareFile(
                 name = s"$lang${Random.nextLong}${inputs.extension}", // random number for avoiding file overwrite/shadowing
@@ -60,15 +66,17 @@ object BrainDrill:
               ctx.log.warn(warning)
               replyTo ! TaskResult(warning)
 
-          apply(Some(replyTo))
+          apply(requester = Some(replyTo))
 
         case In.TaskSucceeded(result) =>
-          ctx.log.info("responding to initiator with successful ExecutionResponse")
-          initiator.foreach(_ ! TaskResult(result))
-          apply(initiator = None)
+          ctx.log.info(s"responding to initiator with successful ExecutionResponse: $result")
+          requester.foreach(_ ! TaskResult(result))
+
+          apply(requester = None)
 
         case In.TaskFailed(reason) =>
-          ctx.log.info("responding to initiator with failed ExecutionResponse")
-          initiator.foreach(_ ! TaskResult(s"execution failed due to: $reason"))
-          apply(initiator = None)
+          ctx.log.warn(s"responding to initiator with failed ExecutionResponse: $reason")
+          requester.foreach(_ ! TaskResult(s"execution failed due to: $reason"))
+
+          apply(requester = None)
 

@@ -11,6 +11,9 @@ import scala.concurrent.Future
 import scala.util.*
 
 
+/**
+ * Prepares the file for running it later inside docker container
+ */
 object FileHandler:
 
   enum In:

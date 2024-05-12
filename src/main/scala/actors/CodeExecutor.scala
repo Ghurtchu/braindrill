@@ -11,6 +11,9 @@ import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.*
 
+/**
+ * Runs the file inside docker container and returns process output
+ */
 object CodeExecutor:
 
   enum In:
