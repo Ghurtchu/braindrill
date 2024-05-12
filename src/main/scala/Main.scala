@@ -1,5 +1,5 @@
 import actors.BrainDrill
-import actors.BrainDrill.ExecutionResponse
+import actors.BrainDrill.TaskResult
 import actors.BrainDrill.In.AssignTask
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
@@ -25,7 +25,7 @@ object Main:
         post:
           entity(as[String]): code =>
               val asyncExecutionResponse = brainDrill
-                .ask[ExecutionResponse](AssignTask(code, lang, _))
+                .ask[TaskResult](AssignTask(code, lang, _))
                 .map(_.output)
                 .recover(_ => "something went wrong") // TODO: make better recovery
 

@@ -12,11 +12,11 @@ import scala.util.*
 object BrainDrill {
 
   enum In:
-    case AssignTask(code: String, language: String, replyTo: ActorRef[ExecutionResponse])
+    case AssignTask(code: String, language: String, replyTo: ActorRef[TaskResult])
     case TaskSucceeded(result: String)
     case TaskFailed(reason: String)
 
-  case class ExecutionResponse(output: String)
+  case class TaskResult(output: String)
 
   private case class ExecutionInputs(dockerImage: String, compiler: String, extension: String)
 
@@ -34,7 +34,7 @@ object BrainDrill {
       )
     )
 
-  def apply(initiator: Option[ActorRef[ExecutionResponse]] = None): Behavior[In] =
+  def apply(initiator: Option[ActorRef[TaskResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
       ctx.log.info(s"${ctx.self} started")
 
@@ -58,18 +58,18 @@ object BrainDrill {
             case None =>
               val warning = s"unsupported language: $lang"
               ctx.log.warn(warning)
-              replyTo ! ExecutionResponse(warning)
+              replyTo ! TaskResult(warning)
 
           apply(Some(replyTo))
 
         case In.TaskSucceeded(result) =>
           ctx.log.info("responding to initiator with successful ExecutionResponse")
-          initiator.foreach(_ ! ExecutionResponse(result))
+          initiator.foreach(_ ! TaskResult(result))
           apply(initiator = None)
 
         case In.TaskFailed(reason) =>
           ctx.log.info("responding to initiator with failed ExecutionResponse")
-          initiator.foreach(_ ! ExecutionResponse(s"execution failed due to: $reason"))
+          initiator.foreach(_ ! TaskResult(s"execution failed due to: $reason"))
           apply(initiator = None)
 }
 
