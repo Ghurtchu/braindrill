@@ -47,7 +47,7 @@ object BrainDrill:
           )
           mappings.get(lang) match
             case Some(inputs) =>
-              ctx.log.info(s"sending CreateFile to $fileHandler")
+              ctx.log.info(s"sending PrepareFile to $fileHandler")
               fileHandler ! FileHandler.In.PrepareFile(
                 name = s"$lang${Random.nextLong}${inputs.extension}", // random number for avoiding file overwrite/shadowing
                 dockerImage = inputs.dockerImage,

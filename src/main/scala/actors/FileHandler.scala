@@ -34,7 +34,7 @@ object FileHandler:
         yield file
 
         val executor = ctx.spawn(CodeExecutor(), "code-executor")
-        // observing child actor for stopping self once its stopped a.k.a Terminated signal is received
+        // observing child actor for self-destruction
         ctx.watch(executor)
 
         asyncFile.foreach: file =>
