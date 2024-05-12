@@ -27,6 +27,7 @@ object FileHandler:
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
     import ctx.executionContext
+    import CodeExecutor.In.*
 
     ctx.log.info(s"processing $msg")
     msg match
@@ -36,12 +37,12 @@ object FileHandler:
           _    <- Future(Using.resource(PrintWriter(name))(_.write(code)))
         yield file
 
-        val executor = ctx.spawn(CodeExecutor(), "code-executor")
+        val codeExecutor = ctx.spawn(CodeExecutor(), "code-executor")
         // observing child actor for self-destruction
-        ctx.watch(executor)
+        ctx.watch(codeExecutor)
 
         asyncFile.foreach: file =>
-          executor ! CodeExecutor.In.Execute(
+          codeExecutor ! Execute(
             dockerImage = dockerImage,
             compiler = compiler,
             file = file,
