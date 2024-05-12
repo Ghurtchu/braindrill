@@ -1,20 +1,20 @@
 package actors
 
-import FileCreator.In.CreateFile
+import FileHandler.In.PrepareFile
 import BrainDrill.In
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.Terminated
 
 import java.io.{File, PrintWriter}
 import scala.concurrent.Future
 import scala.util.*
 
 
-object FileCreator:
+object FileHandler:
 
-  // incoming messages
   enum In:
-    case CreateFile(
+    case PrepareFile(
       name: String,
       code: String,
       dockerImage: String,
@@ -25,26 +25,28 @@ object FileCreator:
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
     import ctx.executionContext
 
+    ctx.log.info(s"processing $msg")
     msg match
-      case In.CreateFile(name, code, dockerImage, compiler, replyTo) =>
-        ctx.log.info("processing CreateFile")
+      case In.PrepareFile(name, code, dockerImage, compiler, replyTo) =>
         val asyncFile = for
-          // create file
           file <- Future(File(name))
-          // put code inside file with resource-safety enabled
           _    <- Future(Using.resource(PrintWriter(name))(_.write(code)))
         yield file
 
-        // once finished
+        val executor = ctx.spawn(CodeExecutor(), "code-executor")
+        // observing child actor for stopping self once its stopped a.k.a Terminated signal is received
+        ctx.watch(executor)
+
         asyncFile.foreach: file =>
-          // reply FileCreated to Master actor
-          replyTo ! BrainDrill.In.FileCreated(
-            file = file,
+          executor ! CodeExecutor.In.Execute(
             dockerImage = dockerImage,
             compiler = compiler,
+            file = file,
             replyTo = replyTo
           )
 
-      ctx.log.info(s"stopping ${ctx.self}")
-      // stop the actor, free up the memory
+        Behaviors.same
+  .receiveSignal:
+    case (ctx, Terminated(ref)) =>
+      ctx.log.info(s"$ref was stopped, stopping myself too: ${ctx.self}")
       Behaviors.stopped
