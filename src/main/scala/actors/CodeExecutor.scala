@@ -1,7 +1,7 @@
 package actors
 
 import BrainDrill.In
-import BrainDrill.In.TaskSucceeded
+import BrainDrill.TaskSucceeded
 import actors.CodeExecutor.Out.Executed
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -11,6 +11,9 @@ import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.*
 
+/**
+ * Runs the file inside docker container and returns process output
+ */
 object CodeExecutor:
 
   enum In:
@@ -19,24 +22,9 @@ object CodeExecutor:
   enum Out:
     case Executed(output: String, exitCode: Int)
 
-  private case class ExecutionInputs(dockerImage: String, compiler: String, extension: String)
-
-  private val mappings: Map[String, ExecutionInputs] =
-    Map(
-      "python" -> ExecutionInputs(
-        dockerImage = "python:3",
-        compiler = "python",
-        extension = ".py"
-      ),
-      "javascript" -> ExecutionInputs(
-        dockerImage = "node:14",
-        compiler = "node",
-        extension = ".js"
-      )
-    )
-
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
     import ctx.executionContext
+    import BrainDrill.*
 
     ctx.log.info(s"processing $msg")
     msg match
@@ -49,8 +37,8 @@ object CodeExecutor:
           s"${System.getProperty("user.dir")}:/app",
           "-w",
           "/app",
-          s"${dockerImage}",
-          s"${compiler}",
+          s"$dockerImage",
+          s"$compiler",
           s"${file.getName}",
         )
 
@@ -66,9 +54,9 @@ object CodeExecutor:
 
         asyncExecutionResult.onComplete:
           case Success(Out.Executed(output, _)) =>
-            replyTo ! BrainDrill.In.TaskSucceeded(output)
+            replyTo ! TaskSucceeded(output)
           case Failure(t) =>
-            replyTo ! BrainDrill.In.TaskFailed(t.toString)
+            replyTo ! TaskFailed(t.toString)
 
         Behaviors.stopped
 

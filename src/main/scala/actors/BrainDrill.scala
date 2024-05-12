@@ -2,21 +2,28 @@ package actors
 
 import FileHandler.In.PrepareFile
 import BrainDrill.In
-import BrainDrill.In.TaskSucceeded
+import BrainDrill.TaskSucceeded
+import org.apache.pekko.actor.typed.receptionist.{Receptionist, ServiceKey}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 import java.io.File
 import scala.util.*
 
+/**
+ * Root actor: assigning tasks to children and responding back to http layer
+ */
 object BrainDrill:
 
-  enum In:
-    case AssignTask(code: String, language: String, replyTo: ActorRef[TaskResult])
-    case TaskSucceeded(result: String)
-    case TaskFailed(reason: String)
+  val WorkerServiceKey = ServiceKey[BrainDrill.AssignTask]("BrainDrill")
 
-  case class TaskResult(output: String)
+  sealed trait In
+
+  case class AssignTask(code: String, language: String, replyTo: ActorRef[TaskResult]) extends In with CborSerializable
+  case class TaskSucceeded(result: String) extends In with CborSerializable
+  case class TaskFailed(reason: String) extends In with CborSerializable
+
+  case class TaskResult(output: String) extends CborSerializable
 
   private case class ExecutionInputs(dockerImage: String, compiler: String, extension: String)
 
@@ -34,19 +41,21 @@ object BrainDrill:
       )
     )
 
-  def apply(initiator: Option[ActorRef[TaskResult]] = None): Behavior[In] =
+  def apply(requester: Option[ActorRef[TaskResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
       ctx.log.info(s"${ctx.self} started")
+      ctx.log.info("Registering myself with receptionist")
+      ctx.system.receptionist ! Receptionist.Register(WorkerServiceKey, ctx.self)
 
       Behaviors.receiveMessage[In]:
-        case msg @ In.AssignTask(code, lang, replyTo) =>
+        case msg @ AssignTask(code, lang, replyTo) =>
           ctx.log.info(s"processing $msg")
-          val fileHandler = ctx.spawn(
-            behavior = FileHandler(),
-            name = s"file-handler"
-          )
           mappings.get(lang) match
             case Some(inputs) =>
+              val fileHandler = ctx.spawn(
+                behavior = FileHandler(),
+                name = s"file-handler"
+              )
               ctx.log.info(s"sending PrepareFile to $fileHandler")
               fileHandler ! FileHandler.In.PrepareFile(
                 name = s"$lang${Random.nextLong}${inputs.extension}", // random number for avoiding file overwrite/shadowing
@@ -60,15 +69,17 @@ object BrainDrill:
               ctx.log.warn(warning)
               replyTo ! TaskResult(warning)
 
-          apply(Some(replyTo))
+          apply(requester = Some(replyTo))
 
-        case In.TaskSucceeded(result) =>
-          ctx.log.info("responding to initiator with successful ExecutionResponse")
-          initiator.foreach(_ ! TaskResult(result))
-          apply(initiator = None)
+        case TaskSucceeded(result) =>
+          ctx.log.info(s"responding to initiator with successful ExecutionResponse: $result")
+          requester.foreach(_ ! TaskResult(result))
 
-        case In.TaskFailed(reason) =>
-          ctx.log.info("responding to initiator with failed ExecutionResponse")
-          initiator.foreach(_ ! TaskResult(s"execution failed due to: $reason"))
-          apply(initiator = None)
+          apply(requester = None)
+
+        case TaskFailed(reason) =>
+          ctx.log.warn(s"responding to initiator with failed ExecutionResponse: $reason")
+          requester.foreach(_ ! TaskResult(s"execution failed due to: $reason"))
+
+          apply(requester = None)
 
