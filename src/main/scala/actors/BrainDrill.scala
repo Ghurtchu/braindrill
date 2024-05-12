@@ -2,8 +2,8 @@ package actors
 
 import FileHandler.In.PrepareFile
 import BrainDrill.In
-import BrainDrill.In.TaskSucceeded
-import org.apache.pekko.actor.typed.receptionist.ServiceKey
+import BrainDrill.TaskSucceeded
+import org.apache.pekko.actor.typed.receptionist.{Receptionist, ServiceKey}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
@@ -15,14 +15,15 @@ import scala.util.*
  */
 object BrainDrill:
 
-  val WorkerServiceKey = ServiceKey[BrainDrill.In.AssignTask]("Worker")
+  val WorkerServiceKey = ServiceKey[BrainDrill.AssignTask]("BrainDrill")
 
-  enum In:
-    case AssignTask(code: String, language: String, replyTo: ActorRef[TaskResult])
-    case TaskSucceeded(result: String)
-    case TaskFailed(reason: String)
+  sealed trait In
 
-  case class TaskResult(output: String)
+  case class AssignTask(code: String, language: String, replyTo: ActorRef[TaskResult]) extends In with CborSerializable
+  case class TaskSucceeded(result: String) extends In with CborSerializable
+  case class TaskFailed(reason: String) extends In with CborSerializable
+
+  case class TaskResult(output: String) extends CborSerializable
 
   private case class ExecutionInputs(dockerImage: String, compiler: String, extension: String)
 
@@ -43,9 +44,11 @@ object BrainDrill:
   def apply(requester: Option[ActorRef[TaskResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
       ctx.log.info(s"${ctx.self} started")
+      ctx.log.info("Registering myself with receptionist")
+      ctx.system.receptionist ! Receptionist.Register(WorkerServiceKey, ctx.self)
 
       Behaviors.receiveMessage[In]:
-        case msg @ In.AssignTask(code, lang, replyTo) =>
+        case msg @ AssignTask(code, lang, replyTo) =>
           ctx.log.info(s"processing $msg")
           mappings.get(lang) match
             case Some(inputs) =>
@@ -68,13 +71,13 @@ object BrainDrill:
 
           apply(requester = Some(replyTo))
 
-        case In.TaskSucceeded(result) =>
+        case TaskSucceeded(result) =>
           ctx.log.info(s"responding to initiator with successful ExecutionResponse: $result")
           requester.foreach(_ ! TaskResult(result))
 
           apply(requester = None)
 
-        case In.TaskFailed(reason) =>
+        case TaskFailed(reason) =>
           ctx.log.warn(s"responding to initiator with failed ExecutionResponse: $reason")
           requester.foreach(_ ! TaskResult(s"execution failed due to: $reason"))
 

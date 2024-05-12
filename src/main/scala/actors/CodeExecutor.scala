@@ -1,7 +1,7 @@
 package actors
 
 import BrainDrill.In
-import BrainDrill.In.TaskSucceeded
+import BrainDrill.TaskSucceeded
 import actors.CodeExecutor.Out.Executed
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -24,7 +24,7 @@ object CodeExecutor:
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
     import ctx.executionContext
-    import BrainDrill.In.*
+    import BrainDrill.*
 
     ctx.log.info(s"processing $msg")
     msg match

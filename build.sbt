@@ -13,6 +13,9 @@ libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.6"
 
 libraryDependencies += "org.apache.pekko" %% "pekko-cluster-typed" % PekkoVersion
 
+libraryDependencies += "org.apache.pekko" %% "pekko-serialization-jackson" % PekkoVersion
+
+
 lazy val root = (project in file("."))
   .settings(name := "exeCUTE")
 
