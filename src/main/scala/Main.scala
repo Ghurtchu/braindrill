@@ -127,10 +127,12 @@ object Main:
   }
   def main(args: Array[String]): Unit = {
     // starting 3 backends
-    startup("backend", 17356)
-    startup("backend", 17357)
-    startup("backend", 17358)
-
+    Iterator
+      .iterate(17356)(_ + 1)
+      .take(3)
+      .foreach:
+        startup("backend", _)
+    
     // starting 1 frontend
     startup("frontend", 0)
   }
@@ -147,27 +149,4 @@ object Main:
     
 
     ActorSystem[Nothing](RootBehaviour(), "ClusterSystem", config)
-  }
-
-
-  def http(): Unit = {
-    given frontend: ActorSystem[Frontend.Event] = ActorSystem(Frontend(), "frontend")
-    given timeout: Timeout = Timeout(5.seconds)
-    given ec: ExecutionContextExecutor = frontend.executionContext
-
-    val route =
-      pathPrefix("lang" / Segment): lang =>
-        post:
-          entity(as[String]): code =>
-            val asyncExecutionResponse = frontend
-              .ask[Frontend.FinalOutput](Frontend.Event.AssignTask(code, lang, _))
-              .map(_.output)
-              .recover(_ => "something went wrong") // TODO: make better recovery
-
-            complete(asyncExecutionResponse)
-
-    Http()
-      .newServerAt("localhost", 9000)
-      .bind(route)
-      .foreach(_ => frontend.log.info(s"Server now online"))
   }
