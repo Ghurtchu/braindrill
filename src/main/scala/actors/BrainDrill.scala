@@ -9,7 +9,7 @@ import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import java.io.File
 import scala.util.*
 
-object BrainDrill {
+object BrainDrill:
 
   enum In:
     case AssignTask(code: String, language: String, replyTo: ActorRef[TaskResult])
@@ -71,5 +71,4 @@ object BrainDrill {
           ctx.log.info("responding to initiator with failed ExecutionResponse")
           initiator.foreach(_ ! TaskResult(s"execution failed due to: $reason"))
           apply(initiator = None)
-}
 
