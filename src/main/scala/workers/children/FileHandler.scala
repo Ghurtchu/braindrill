@@ -1,10 +1,9 @@
-package workers
+package workers.children
 
-import FileHandler.In.PrepareFile
-import Worker.In
-import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.{ActorRef, Terminated}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.Terminated
+import workers.children.FileHandler.In.PrepareFile
+import workers.Worker
 
 import java.io.{File, PrintWriter}
 import scala.concurrent.Future
@@ -26,8 +25,8 @@ object FileHandler:
     )
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
-    import ctx.executionContext
     import CodeExecutor.In.*
+    import ctx.executionContext
 
     ctx.log.info(s"processing $msg")
     msg match

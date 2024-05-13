@@ -1,12 +1,13 @@
 package workers
 
-import FileHandler.In.PrepareFile
+import workers.children.FileHandler.In.PrepareFile
 import Worker.In
 import Worker.ExecutionSucceeded
 import org.apache.pekko.actor.typed.receptionist.{Receptionist, ServiceKey}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import serialization.CborSerializable
+import workers.children.FileHandler
 
 import java.io.File
 import scala.util.*

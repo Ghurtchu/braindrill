@@ -1,8 +1,9 @@
-package workers
+package workers.children
 
-import Worker.In
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import workers.Worker
+import workers.Worker.{ExecutionFailed, ExecutionSucceeded}
 
 import java.io.{BufferedReader, File}
 import scala.annotation.tailrec
@@ -21,8 +22,8 @@ object CodeExecutor:
   case class Executed(output: String, exitCode: Int)
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
-    import ctx.executionContext
     import Worker.*
+    import ctx.executionContext
 
     ctx.log.info(s"processing $msg")
     msg match
