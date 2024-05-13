@@ -11,7 +11,9 @@ TODO:
 - introduce local master and worker pekko actors - ✅
 - introduce Pekko Cluster - ✅
 - turn local master actor into load balancer node - ✅
-- create 3 worker nodes and enable autoscaling - ❌ 
+- create 3 worker nodes - ✅
+- make worker actors sharded on each node (e.g 25 actors on each node, awaiting tasks) - ✅
+- enable autoscaling  - ❌
 - enable `RoundRobin` load balancing - ❌
-- make worker actors sharded on each node (e.g 100 actors on each node, awaiting tasks) - ❌
+- wrap the cluster in k8s - ❌
 
