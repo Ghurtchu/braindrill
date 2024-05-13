@@ -17,3 +17,6 @@ TODO:
 - enable `RoundRobin` load balancing - ❌
 - wrap the cluster in k8s - ❌
 
+Architecture Diagram:
+
+![My Image](assets/braindrill.png)
