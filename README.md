@@ -19,4 +19,4 @@ TODO:
 
 Architecture Diagram:
 
-![My Image](assets/architecture.png)
+![My Image](assets/diagram.png)
