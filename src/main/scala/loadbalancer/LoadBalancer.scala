@@ -34,6 +34,8 @@ object LoadBalancer:
   final case class TaskResult(output: String)
 
   def apply(): Behavior[In] = Behaviors.setup: ctx =>
+    ctx.setLoggerName("LoadBalancer")
+
     // adapter for subscribing for receptionist messages
     val adapter = ctx.messageAdapter[Receptionist.Listing]:
       case Worker.WorkerServiceKey.Listing(workers) =>
@@ -52,17 +54,18 @@ object LoadBalancer:
     Behaviors.receiveMessage[In]:
        // if workers are updated
       case In.WorkersUpdated(newWorkers) =>
-        ctx.log.info("List of services registered with the receptionist changed: {}", newWorkers)
+        ctx.log.info("{} received WorkersUpdated. New workers: {}", ctx.self.path.name, newWorkers)
 
         // update state by copying them
         behavior(ctx, newWorkers.toSeq)
 
         // if asked to assign task
-      case In.AssignTask(code, lang, replyTo) =>
+      case msg @ In.AssignTask(code, lang, replyTo) =>
+        ctx.log.info("{} received {}", ctx.self.path.name, msg)
         given timeout: Timeout = Timeout(5.seconds)
         // choose random worker
         val worker: ActorRef[StartExecution] = workers(scala.util.Random.nextInt(workers.size))
-        ctx.log.info("sending work for processing to {}", worker)
+        ctx.log.infoN("{} sending Worker.StartExecution to {}", ctx.self.path.name, worker.ref.path.name)
         // send StartExecution to worker and send to self TaskSucceeded or TaskFailed
         ctx.ask[Worker.StartExecution, Worker.ExecutionResult](worker, Worker.StartExecution(code, lang, _)):
           case Success(res) => In.TaskSucceeded(res.value)
@@ -73,14 +76,14 @@ object LoadBalancer:
 
         // if task succeeded return TaskResult
       case In.TaskSucceeded(output) =>
-        ctx.log.info("Got output: {}", output)
+        ctx.log.info("{} got output: {}", ctx.self.path.name, output)
         replyTo.foreach(_ ! TaskResult(output))
 
         Behaviors.same
 
       // if task failed return TaskResult
       case In.TaskFailed(reason) =>
-        ctx.log.warn("Failed due to: {}", reason)
+        ctx.log.info("{} failed due to: {}", ctx.self.path.name, reason)
         replyTo.foreach(_ ! TaskResult(reason))
 
         Behaviors.same

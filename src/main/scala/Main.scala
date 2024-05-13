@@ -24,7 +24,7 @@ object Main:
           pekko.cluster.roles = [$role]
 
           """)
-      .withFallback(ConfigFactory.load("transformation"))
+      .withFallback(ConfigFactory load "transformation")
 
     // create actor system with cluster bootstrap
     ActorSystem[Nothing](ClusterBootstrap(), "ClusterSystem", config)

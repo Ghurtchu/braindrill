@@ -52,21 +52,25 @@ object Worker:
 
   def apply(requester: Option[ActorRef[ExecutionResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
-      ctx.log.info("registering myself with Receptionist")
+      ctx.setLoggerName("Worker")
+      val selfName = ctx.self.path.name
+      val requesterName = requester.fold("unknown actor")(_.path.name)
+
+      ctx.log.info("registering myself: {} with Receptionist", selfName)
       // register to Receptionist so that LoadBalancer is updated with new worker references
       ctx.system.receptionist ! Receptionist.Register(WorkerServiceKey, ctx.self)
 
       Behaviors.receiveMessage[In]:
           // if asked to start execution
         case msg @ StartExecution(code, lang, replyTo) =>
-          ctx.log.info(s"processing $msg")
+          ctx.log.info(s"{} processing StartExecution", selfName)
           // try reading inputs for programming language
           mappings.get(lang) match
             // if we have inputs
             case Some(inputs) =>
               // create file handler actor which prepares the file to be executed later
               val fileHandler = ctx.spawn(FileHandler(), s"file-handler")
-              ctx.log.info(s"sending PrepareFile to $fileHandler")
+              ctx.log.info(s"{} sending PrepareFile to {}", selfName, fileHandler.path.name)
               
               // send PrepareFile message
               fileHandler ! FileHandler.In.PrepareFile(
@@ -89,14 +93,14 @@ object Worker:
 
           // forward success outcome to LoadBalancer
         case msg @ ExecutionSucceeded(result) =>
-          ctx.log.info(s"responding to initiator with successful ExecutionResponse: $result")
+          ctx.log.info(s"{} sending ExecutionSucceeded to {}", selfName, requesterName)
           requester.foreach(_ ! msg)
 
           apply(requester = None)
 
         // forward failed outcome to LoadBalancer
         case msg @ ExecutionFailed(reason) =>
-          ctx.log.warn(s"responding to initiator with failed ExecutionResponse: $reason")
+          ctx.log.info(s"{} sending ExecutionFailed to {}", selfName, requesterName)
           requester.foreach(_ ! msg)
 
           apply(requester = None)

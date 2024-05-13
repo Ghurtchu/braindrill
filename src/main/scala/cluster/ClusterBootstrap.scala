@@ -3,7 +3,7 @@ package cluster
 import workers.Worker
 import workers.Worker.In
 import workers.Worker.StartExecution
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import loadbalancer.LoadBalancer
 import org.apache.pekko
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -19,7 +19,7 @@ import pekko.actor.typed.scaladsl.*
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.*
-import scala.util.{Failure, Success}
+import scala.util._
 
 object ClusterBootstrap:
   def apply(): Behavior[Nothing] = Behaviors.setup[Nothing]: ctx =>
@@ -27,13 +27,15 @@ object ClusterBootstrap:
     val cluster = Cluster(ctx.system)
     // reach the node
     val node = cluster.selfMember
+    // reach the config
+    val config = ctx.system.settings.config
 
     // if it's worker node
     if node hasRole "worker" then
       // read how many worker actors should be on each worker node
-      val workersPerNode = ctx.system.settings.config.getInt("transformation.workers-per-node")
+      val workersPerNode = config getInt "transformation.workers-per-node"
       // spawn all worker actors on that node
-      (1 to workersPerNode).foreach: n =>
+      1 to workersPerNode foreach: n =>
         ctx.spawn(Worker(), s"Worker$n")
 
     // if it's load balancer node
@@ -42,14 +44,19 @@ object ClusterBootstrap:
       given timeout: Timeout = Timeout(3.seconds)
       given ec: ExecutionContextExecutor = ctx.executionContext
 
-      // spawn load balancer instance
-      val loadBalancer = ctx.spawn(LoadBalancer(), "LoadBalancer")
+      // load the config for load balancer amount, get or else 2
+      val loadBalancerAmount = Try(config getInt "transformation.load-balancer") getOrElse 2
+
+      // spawn at least 2 load balancer instances
+      val loadBalancers = (1 to loadBalancerAmount).map: n =>
+        ctx.spawn(LoadBalancer(), s"LoadBalancer$n")
 
       // define http route for accepting requests
       val route =
         pathPrefix("lang" / Segment): lang =>
           post:
             entity(as[String]): code => // read code from request body
+              val loadBalancer = loadBalancers(Random nextInt loadBalancerAmount)
               val asyncExecutionResponse = loadBalancer // ask load balancer
                 .ask[LoadBalancer.TaskResult](LoadBalancer.In.AssignTask(code, lang, _)) // to assign task to one of the workers
                 .map(_.output) // get the output
