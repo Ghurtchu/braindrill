@@ -5,16 +5,18 @@ import pekko.actor.typed.ActorSystem
 
 object Main:
   def main(args: Array[String]): Unit =
+    // deploy 3 workers nodes
     Iterator
       .iterate(17356)(_ + 1)
       .take(3)
       .foreach:
-        deploy("backend", _)
+        deploy("worker", _)
 
+    // deploy single load-balancer
     deploy("load-balancer", 0)
 
   private def deploy(role: String, port: Int): Unit =
-    // Override the configuration of the port and role
+    // load config with default fallback
     val config = ConfigFactory
       .parseString(
         s"""
@@ -24,5 +26,5 @@ object Main:
           """)
       .withFallback(ConfigFactory.load("transformation"))
 
-
+    // create actor system with cluster bootstrap
     ActorSystem[Nothing](ClusterBootstrap(), "ClusterSystem", config)

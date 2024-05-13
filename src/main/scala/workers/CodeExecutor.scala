@@ -1,8 +1,6 @@
 package workers
 
-import BrainDrill.In
-import BrainDrill.TaskSucceeded
-import workers.CodeExecutor.Out.Executed
+import Worker.In
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
@@ -11,24 +9,26 @@ import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.*
 
-/**
- * Runs the file inside docker container and returns process output
- */
+// Actor that the file inside docker container and returns process output
 object CodeExecutor:
 
+  // incoming messages
   enum In:
-    case Execute(dockerImage: String, compiler: String, file: File, replyTo: ActorRef[BrainDrill.In])
+    // received from FileHandler to run the docker process
+    case Execute(dockerImage: String, compiler: String, file: File, replyTo: ActorRef[Worker.In])
 
-  enum Out:
-    case Executed(output: String, exitCode: Int)
+  // sent back to FileHandler
+  case class Executed(output: String, exitCode: Int)
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
     import ctx.executionContext
-    import BrainDrill.*
+    import Worker.*
 
     ctx.log.info(s"processing $msg")
     msg match
+        // in case Execute is receied
       case In.Execute(dockerImage, compiler, file, replyTo) =>
+        // create docker run commands
         val commands = Array(
           "docker",
           "run",
@@ -43,26 +43,32 @@ object CodeExecutor:
         )
 
         val asyncExecutionResult = for
-          ps <- execute(commands)
-          (asyncSuccess, asyncError) = read(ps.inputReader) -> read(ps.errorReader)
-          ((success, error), exitCode) <- asyncSuccess.zip(asyncError).zip(Future(ps.waitFor))
-          _ = Future(file.delete)
-        yield Out.Executed(
+          ps <- execute(commands) // start docker process
+          (asyncSuccess, asyncError) = read(ps.inputReader) -> read(ps.errorReader) // read success and error concurrently
+          ((success, error), exitCode) <- asyncSuccess.zip(asyncError).zip(Future(ps.waitFor)) // join success, error and exit code
+          _ = Future(file.delete) // remove file in the background to free up the memory
+        yield Executed(
           output = if success.nonEmpty then success else error,
           exitCode = exitCode
         )
 
         asyncExecutionResult.onComplete:
-          case Success(Out.Executed(output, _)) =>
-            replyTo ! TaskSucceeded(output)
+            // in case code executes without issues
+          case Success(Executed(output, _)) =>
+            // respond back normally
+            replyTo ! ExecutionSucceeded(output)
+            // otherwise
           case Failure(t) =>
-            replyTo ! TaskFailed(t.toString)
+            // indicate why it failed
+            replyTo ! ExecutionFailed(t.toString)
 
         Behaviors.stopped
 
+  // starts docker process
   private def execute(commands: Array[String])(using ec: ExecutionContext) =
     Future(Runtime.getRuntime.exec(commands))
 
+  // reads code output
   private def read(reader: BufferedReader)(using ec: ExecutionContext) =
     Future:
       Using.resource(reader): reader =>
@@ -75,6 +81,7 @@ object CodeExecutor:
 
         loop()
 
+  // reads single line
   private def readLine(reader: BufferedReader) =
     Try(reader.readLine)
       .toOption
