@@ -2,6 +2,7 @@ import actors.BrainDrill
 import actors.BrainDrill.{In, TaskResult}
 import actors.BrainDrill.AssignTask
 import com.typesafe.config.ConfigFactory
+import loadbalancer.LoadBalancer
 import org.apache.pekko
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.receptionist.Receptionist
@@ -27,99 +28,40 @@ import scala.util.{Failure, Success}
 
 object Main:
 
-  object Frontend {
-
-    enum Event {
-      case BrainDrillsUpdated(newDrills: Set[ActorRef[BrainDrill.AssignTask]])
-      case AssignTask(code: String, language: String, replyTo: ActorRef[FinalOutput])
-      case TaskSucceeded(output: String)
-      case TaskFailed(why: String)
-    }
-    
-    case class FinalOutput(output: String)
-
-    def apply(): Behavior[Event] = Behaviors.setup { ctx =>
-
-      val adapter = ctx.messageAdapter[Receptionist.Listing] {
-        case BrainDrill.WorkerServiceKey.Listing(workers) =>
-          Event.BrainDrillsUpdated(workers)
-      }
-
-      ctx.system.receptionist ! Receptionist.Subscribe(BrainDrill.WorkerServiceKey, adapter)
-
-      running(ctx, Seq.empty)
-    }
-
-    private def running(ctx: ActorContext[Event], workers: Seq[ActorRef[BrainDrill.AssignTask]], replyTo: Option[ActorRef[FinalOutput]] = None): Behavior[Event] = {
-
-      Behaviors.receiveMessage[Event] {
-
-        case Event.BrainDrillsUpdated(newWorkers) =>
-          ctx.log.info("List of services registered with the receptionist changed: {}", newWorkers)
-
-          running(ctx, newWorkers.toSeq)
-
-        case Event.AssignTask(code, lang, replyTo) =>
-          given timeout: Timeout = Timeout(5.seconds)
-          val worker: ActorRef[AssignTask] = workers.head
-          ctx.log.info("sending work for processing to {}", worker)
-          ctx.ask[AssignTask, TaskResult](worker, AssignTask(code, lang, _)) {
-            case Success(res) => Event.TaskSucceeded(res.output)
-            case Failure(exception) => Event.TaskFailed(exception.toString)
-          }
-          running(ctx, workers, Some(replyTo))
-
-        case Event.TaskSucceeded(output) =>
-          ctx.log.info("Got output: {}", output)
-          replyTo.foreach(_ ! FinalOutput(output))
-          Behaviors.same
-
-        case Event.TaskFailed(why) =>
-          ctx.log.info("Failed due to: {}", why)
-          replyTo.foreach(_ ! FinalOutput(why))
-          Behaviors.same
-      }
-    }
-
-
-
-  }
-
   object RootBehaviour {
     def apply(): Behavior[Nothing] = Behaviors.setup[Nothing] { ctx =>
       val cluster = Cluster(ctx.system)
       val node = cluster.selfMember
 
-      if (node.hasRole("backend")) {
+      if (node hasRole "backend") {
         val workersPerNode = ctx.system.settings.config.getInt("transformation.workers-per-node")
         (1 to 10).foreach: n =>
           ctx.spawn(BrainDrill(), s"BrainDrill$n")
       }
 
-      if (node.hasRole("frontend")) {
-        
+      if (node hasRole "load-balancer") {
         given system: ActorSystem[Nothing] = ctx.system
-        
-        val frontend = ctx.spawn(Frontend(), "Frontend")
-        
         given timeout: Timeout = Timeout(5.seconds)
-
         given ec: ExecutionContextExecutor = ctx.executionContext
+
+        val loadBalancer = ctx.spawn(LoadBalancer(), "LoadBalancer")
 
         val route =
           pathPrefix("lang" / Segment): lang =>
             post:
               entity(as[String]): code =>
-                val asyncExecutionResponse = frontend
-                  .ask[Frontend.FinalOutput](Frontend.Event.AssignTask(code, lang, _))
+                val asyncExecutionResponse = loadBalancer
+                  .ask[LoadBalancer.TaskResult](LoadBalancer.In.AssignTask(code, lang, _))
                   .map(_.output)
                   .recover(_ => "something went wrong") // TODO: make better recovery
 
                 complete(asyncExecutionResponse)
 
+        val (host, port) = ("localhost", 9000)
         Http()
-          .newServerAt("localhost", 9000)
+          .newServerAt(host, port)
           .bind(route)
+          .foreach(_ => ctx.log.info(s"Server deployed to: $host$port"))
       }
       
       Behaviors.empty[Nothing]
@@ -134,7 +76,7 @@ object Main:
         startup("backend", _)
     
     // starting 1 frontend
-    startup("frontend", 0)
+    startup("load-balancer", 0)
   }
 
   def startup(role: String, port: Int): Unit = {
@@ -144,6 +86,7 @@ object Main:
         s"""
           pekko.remote.artery.canonical.port=$port
           pekko.cluster.roles = [$role]
+          
           """)
       .withFallback(ConfigFactory.load("transformation"))
     
