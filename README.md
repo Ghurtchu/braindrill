@@ -19,4 +19,4 @@ TODO:
 
 Architecture Diagram:
 
-![My Image](assets/braindrill.png)
+![My Image](assets/architecture.png)
