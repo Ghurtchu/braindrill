@@ -1,4 +1,4 @@
-package actors
+package workers
 
 import FileHandler.In.PrepareFile
 import BrainDrill.In
@@ -6,6 +6,7 @@ import BrainDrill.TaskSucceeded
 import org.apache.pekko.actor.typed.receptionist.{Receptionist, ServiceKey}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import serialization.CborSerializable
 
 import java.io.File
 import scala.util.*

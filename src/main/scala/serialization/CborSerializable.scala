@@ -1,4 +1,4 @@
-package actors
+package serialization
 
 /**
  * Marker trait to tell Apache Pekko to serialize messages into CBOR using Jackson for sending over the network

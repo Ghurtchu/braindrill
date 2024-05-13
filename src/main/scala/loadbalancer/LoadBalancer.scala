@@ -1,8 +1,8 @@
 package loadbalancer
 
-import actors.BrainDrill
-import actors.BrainDrill.{In, TaskResult}
-import actors.BrainDrill.AssignTask
+import workers.BrainDrill
+import workers.BrainDrill.{In, TaskResult}
+import workers.BrainDrill.AssignTask
 import com.typesafe.config.ConfigFactory
 import org.apache.pekko
 import org.apache.pekko.actor.typed.scaladsl.Behaviors

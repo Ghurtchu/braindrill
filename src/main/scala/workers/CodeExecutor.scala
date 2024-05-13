@@ -1,8 +1,8 @@
-package actors
+package workers
 
 import BrainDrill.In
 import BrainDrill.TaskSucceeded
-import actors.CodeExecutor.Out.Executed
+import workers.CodeExecutor.Out.Executed
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 

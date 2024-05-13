@@ -1,4 +1,4 @@
-package actors
+package workers
 
 import FileHandler.In.PrepareFile
 import BrainDrill.In
