@@ -13,7 +13,9 @@ TODO:
 - turn local master actor into load balancer node - ✅
 - create 3 worker nodes - ✅
 - make worker actors sharded on each node (e.g 25 actors on each node, awaiting tasks) - ✅
-- enable autoscaling  - ❌
+- run cluster within docker containers - ❌
+- run code inside running container instead of starting new docker process each time - ❌ 
+- enable autoscaling  - ❌ 
 - enable `RoundRobin` load balancing - ❌
 - wrap the cluster in k8s - ❌
 

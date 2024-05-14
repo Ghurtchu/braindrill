@@ -33,7 +33,7 @@ object ClusterBootstrap:
     // if it's worker node
     if node hasRole "worker" then
       // read how many worker actors should be on each worker node
-      val workersPerNode = config getInt "transformation.workers-per-node"
+      val workersPerNode = Try(config.getInt("transformation.workers-per-node")).getOrElse(10)
       // spawn all worker actors on that node
       1 to workersPerNode foreach: n =>
         ctx.spawn(Worker(), s"Worker$n")
@@ -45,7 +45,7 @@ object ClusterBootstrap:
       given ec: ExecutionContextExecutor = ctx.executionContext
 
       // load the config for load balancer amount, get or else 2
-      val loadBalancerAmount = Try(config getInt "transformation.load-balancer") getOrElse 2
+      val loadBalancerAmount = Try(config.getInt("transformation.load-balancer")).getOrElse(2)
 
       // spawn at least 2 load balancer instances
       val loadBalancers = (1 to loadBalancerAmount).map: n =>
@@ -64,7 +64,7 @@ object ClusterBootstrap:
 
               complete(asyncExecutionResponse) // send back HTTP response
 
-      val (host, port) = ("localhost", 9000) // make them configurable
+      val (host, port) = ("0.0.0.0", 8080) // make them configurable
 
       // deploy http server
       Http()

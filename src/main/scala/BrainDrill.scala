@@ -3,7 +3,8 @@ import com.typesafe.config.ConfigFactory
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 
-object Main:
+object BrainDrill:
+
   def main(args: Array[String]): Unit =
     // deploy 3 workers nodes
     Iterator
@@ -24,7 +25,7 @@ object Main:
           pekko.cluster.roles = [$role]
 
           """)
-      .withFallback(ConfigFactory load "transformation")
+      .withFallback(ConfigFactory.load("transformation"))
 
     // create actor system with cluster bootstrap
     ActorSystem[Nothing](ClusterBootstrap(), "ClusterSystem", config)
