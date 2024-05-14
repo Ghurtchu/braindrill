@@ -27,7 +27,7 @@ object CodeExecutor:
 
     ctx.log.info(s"processing $msg")
     msg match
-        // in case Execute is receied
+        // in case Execute is received
       case In.Execute(dockerImage, compiler, file, replyTo) =>
         // create docker run commands
         val commands = Array(

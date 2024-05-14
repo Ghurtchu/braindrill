@@ -7,8 +7,7 @@ Requirements for running locally:
 
 Instructions for running locally:
 - `docker build -t braindrill .`
-- `docker run -p 8080:8080 braindrill`
-
+- `docker run -p 8080:8080 -v /var/run/docker.sock:/var/run/docker.sock braindrill`
 
 The goal of the project is to gain some practical experience using Pekko Cluster, containers, k8s and typed actor concurrency.
 

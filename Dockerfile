@@ -1,6 +1,10 @@
 # Use an official OpenJDK runtime as a parent image
 FROM hseeberger/scala-sbt:17.0.2_1.6.2_3.1.1
 
+# Install Docker CLI
+RUN apt-get update && \
+    apt-get install -y docker.io
+
 # Set the working directory to /app
 WORKDIR /app
 
