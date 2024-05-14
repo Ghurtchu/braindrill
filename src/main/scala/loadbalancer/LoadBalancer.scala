@@ -1,5 +1,6 @@
 package loadbalancer
 
+import cluster.ClusterBootstrap
 import workers.Worker
 import workers.Worker.In
 import workers.Worker.StartExecution
@@ -13,6 +14,7 @@ import pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.util.Timeout
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
+import workers.helpers.DockerImagePuller
 
 import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
@@ -23,6 +25,8 @@ object LoadBalancer:
   enum In:
     // received when workers are updated on any node
     case WorkersUpdated(newDrills: Set[ActorRef[Worker.StartExecution]])
+    // ???
+    case ImagePullersUpdated(newImagePullers: Set[ActorRef[DockerImagePuller.In.PullDockerImage]])
     // received from http layer to assign task to any worker on any node
     case AssignTask(code: String, language: String, replyTo: ActorRef[TaskResult])
     // received when worker responds with success
@@ -40,15 +44,20 @@ object LoadBalancer:
     val adapter = ctx.messageAdapter[Receptionist.Listing]:
       case Worker.WorkerServiceKey.Listing(workers) =>
         In.WorkersUpdated(workers)
+      case DockerImagePuller.DockerImagePullerServiceKey.Listing(imagePullers) =>
+        In.ImagePullersUpdated(imagePullers)
 
     // subscribing for any changes represented by Worker.WorkerServiceKey
     ctx.system.receptionist ! Receptionist.Subscribe(Worker.WorkerServiceKey, adapter)
+    // subscribing for any changes represented by DockerImagePuller.DockerImagePullerServiceKey
+    ctx.system.receptionist ! Receptionist.Subscribe(DockerImagePuller.DockerImagePullerServiceKey, adapter)
 
     behavior(ctx)
 
   private def behavior(
     ctx: ActorContext[In],
     workers: Seq[ActorRef[Worker.StartExecution]] = Seq.empty, // # of workers
+    imagePullers: Seq[ActorRef[DockerImagePuller.In.PullDockerImage]] = Seq.empty, // ???
     replyTo: Option[ActorRef[TaskResult]] = None // # http layer actor to which LoadBalancer replies
   ): Behavior[In] =
     Behaviors.receiveMessage[In]:
@@ -72,8 +81,20 @@ object LoadBalancer:
           case Failure(exception) => In.TaskFailed(exception.toString)
 
         // registering Some(replyTo)
-        behavior(ctx, workers, Some(replyTo))
+        behavior(ctx, workers, Seq.empty, Some(replyTo))
 
+      case msg @ In.ImagePullersUpdated(imagePullers) =>
+        ctx.log.infoN("{} sending PullDockerImage to each DockerImagePuller", ctx.self.path.name)
+        ClusterBootstrap
+          .LanguageToDockerImage
+          .values
+          .zip(imagePullers)
+          .foreach { case (image, actor) =>
+            ctx.log.infoN("{} sending PullDockerImage to each {}", ctx.self.path.name, actor.path.name)
+            actor ! DockerImagePuller.In.PullDockerImage(image)
+          }
+
+        Behaviors.same
         // if task succeeded return TaskResult
       case In.TaskSucceeded(output) =>
         ctx.log.info("{} got output: {}", ctx.self.path.name, output)

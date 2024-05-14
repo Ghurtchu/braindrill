@@ -1,6 +1,7 @@
 package cluster
 
 import workers.Worker
+import workers.helpers.DockerImagePuller
 import workers.Worker.In
 import workers.Worker.StartExecution
 import com.typesafe.config.{Config, ConfigFactory}
@@ -22,6 +23,12 @@ import scala.concurrent.duration.*
 import scala.util._
 
 object ClusterBootstrap:
+
+  val LanguageToDockerImage = Map(
+    "python" -> "python:3",
+    "javascript" -> "node:14"
+  )
+
   def apply(): Behavior[Nothing] = Behaviors.setup[Nothing]: ctx =>
     // retrieve the Cluster instance
     val cluster = Cluster(ctx.system)
@@ -37,6 +44,9 @@ object ClusterBootstrap:
       // spawn all worker actors on that node
       1 to workersPerNode foreach: n =>
         ctx.spawn(Worker(), s"Worker$n")
+
+      LanguageToDockerImage.values.foreach: image =>
+        ctx.spawn(DockerImagePuller(), s"DockerImagePuller$image")
 
     // if it's load balancer node
     if node hasRole "load-balancer" then

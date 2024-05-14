@@ -1,8 +1,8 @@
-package workers.children
+package workers.helpers
 
 import org.apache.pekko.actor.typed.{ActorRef, Terminated}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import workers.children.FileHandler.In.PrepareFile
+import workers.helpers.FileHandler.In.PrepareFile
 import workers.Worker
 
 import java.io.{File, PrintWriter}

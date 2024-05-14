@@ -2,6 +2,14 @@
 
 Drill your brain, because why the heck not.
 
+Requirements for running locally:
+- docker engine
+
+Instructions for running locally:
+- `docker build -t braindrill .`
+- `docker run -p 8080:8080 braindrill`
+
+
 The goal of the project is to gain some practical experience using Pekko Cluster, containers, k8s and typed actor concurrency.
 
 TODO:
@@ -13,7 +21,7 @@ TODO:
 - turn local master actor into load balancer node - ✅
 - create 3 worker nodes - ✅
 - make worker actors sharded on each node (e.g 25 actors on each node, awaiting tasks) - ✅
-- run cluster within docker containers - ❌
+- run cluster within docker containers - ✅
 - run code inside running container instead of starting new docker process each time - ❌ 
 - enable autoscaling  - ❌ 
 - enable `RoundRobin` load balancing - ❌

@@ -1,4 +1,4 @@
-package workers.children
+package workers.helpers
 
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -43,8 +43,14 @@ object CodeExecutor:
           s"${file.getName}",
         )
 
+        val cmd = Array(
+          compiler,
+          file.getName
+        )
+        println(s"[commands]: ${cmd.toList}")
+
         val asyncExecutionResult = for
-          ps <- execute(commands) // start docker process
+          ps <- execute(cmd) // start docker process
           (asyncSuccess, asyncError) = read(ps.inputReader) -> read(ps.errorReader) // read success and error concurrently
           ((success, error), exitCode) <- asyncSuccess.zip(asyncError).zip(Future(ps.waitFor)) // join success, error and exit code
           _ = Future(file.delete) // remove file in the background to free up the memory
@@ -66,11 +72,11 @@ object CodeExecutor:
         Behaviors.stopped
 
   // starts docker process
-  private def execute(commands: Array[String])(using ec: ExecutionContext) =
+  def execute(commands: Array[String])(using ec: ExecutionContext) =
     Future(Runtime.getRuntime.exec(commands))
 
   // reads code output
-  private def read(reader: BufferedReader)(using ec: ExecutionContext) =
+  def read(reader: BufferedReader)(using ec: ExecutionContext) =
     Future:
       Using.resource(reader): reader =>
 
@@ -83,7 +89,7 @@ object CodeExecutor:
         loop()
 
   // reads single line
-  private def readLine(reader: BufferedReader) =
+  def readLine(reader: BufferedReader) =
     Try(reader.readLine)
       .toOption
       .filter(line => line != null && line.nonEmpty)
