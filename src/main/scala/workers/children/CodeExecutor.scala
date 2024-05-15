@@ -10,13 +10,13 @@ import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.*
 
-// Actor that the file inside docker container and returns process output
+// Actor that executes the submitted code and returns the success/failed output
 object CodeExecutor:
 
   // incoming messages
   enum In:
     // received from FileHandler to run the docker process
-    case Execute(dockerImage: String, compiler: String, file: File, replyTo: ActorRef[Worker.In])
+    case Execute(compiler: String, file: File, replyTo: ActorRef[Worker.In])
 
   // sent back to FileHandler
   case class Executed(output: String, exitCode: Int)
@@ -24,27 +24,14 @@ object CodeExecutor:
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
     import Worker.*
     import ctx.executionContext
-
-    ctx.log.info(s"processing $msg")
+    
     msg match
         // in case Execute is receied
-      case In.Execute(dockerImage, compiler, file, replyTo) =>
+      case In.Execute(compiler, file, replyTo) =>
+        ctx.log.info(s"{} execuding submitted code", ctx.self.path.name)
         // create docker run commands
-        val commands = Array(
-          "docker",
-          "run",
-          "--rm", // remove container after it's done
-          "-v",
-          s"${System.getProperty("user.dir")}:/app",
-          "-w",
-          "/app",
-          s"$dockerImage",
-          s"$compiler",
-          s"${file.getName}",
-        )
-
         val asyncExecutionResult = for
-          ps <- execute(commands) // start docker process
+          ps <- execute(Array(compiler, file.getName)) // start docker process
           (asyncSuccess, asyncError) = read(ps.inputReader) -> read(ps.errorReader) // read success and error concurrently
           ((success, error), exitCode) <- asyncSuccess.zip(asyncError).zip(Future(ps.waitFor)) // join success, error and exit code
           _ = Future(file.delete) // remove file in the background to free up the memory

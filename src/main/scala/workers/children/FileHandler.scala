@@ -10,7 +10,7 @@ import scala.concurrent.Future
 import scala.util.*
 
 
-// Actor that prepares the file for running it later inside docker container
+// Actor that prepares the file for before running it
 object FileHandler:
 
   // incoming messages
@@ -19,7 +19,6 @@ object FileHandler:
     case PrepareFile(
       name: String,
       code: String,
-      dockerImage: String,
       compiler: String,
       replyTo: ActorRef[Worker.In]
     )
@@ -31,7 +30,7 @@ object FileHandler:
     ctx.log.info(s"processing $msg")
     msg match
         // prepared from Worker to prepare file
-      case In.PrepareFile(name, code, dockerImage, compiler, replyTo) =>
+      case In.PrepareFile(name, code, compiler, replyTo) =>
         val asyncFile = for
           file <- Future(File(name)) // create file
           _    <- Future(Using.resource(PrintWriter(name))(_.write(code))) // write code to it
@@ -45,7 +44,6 @@ object FileHandler:
         // send Execute command to it
         asyncFile.foreach: file =>
           codeExecutor ! Execute(
-            dockerImage = dockerImage,
             compiler = compiler,
             file = file,
             replyTo = replyTo

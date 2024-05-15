@@ -33,21 +33,13 @@ object Worker:
   case class ExecutionFailed(value: String) extends ExecutionResult with CborSerializable
 
   // private data model for grouping execution inputs for docker process
-  private case class ExecutionInputs(dockerImage: String, compiler: String, extension: String)
+  private case class ExecutionInputs(compiler: String, extension: String)
 
   // mapping programming language to its inputs
   private val mappings: Map[String, ExecutionInputs] =
     Map(
-      "python" -> ExecutionInputs(
-        dockerImage = "python:3",
-        compiler = "python",
-        extension = ".py"
-      ),
-      "javascript" -> ExecutionInputs(
-        dockerImage = "node:14",
-        compiler = "node",
-        extension = ".js"
-      )
+      "python" -> ExecutionInputs("python", ".py"),
+      "javascript" -> ExecutionInputs("node", ".js")
     )
 
   def apply(requester: Option[ActorRef[ExecutionResult]] = None): Behavior[In] =
@@ -75,7 +67,6 @@ object Worker:
               // send PrepareFile message
               fileHandler ! FileHandler.In.PrepareFile(
                 name = s"$lang${Random.nextLong}${inputs.extension}", // random number for avoiding file overwrite/shadowing
-                dockerImage = inputs.dockerImage,
                 compiler = inputs.compiler,
                 code = code,
                 replyTo = ctx.self
