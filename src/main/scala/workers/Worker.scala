@@ -44,9 +44,7 @@ object Worker:
 
   def apply(requester: Option[ActorRef[ExecutionResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
-      ctx.setLoggerName("Worker")
       val selfName = ctx.self.path.name
-      val requesterName = requester.fold("unknown actor")(_.path.name)
 
       ctx.log.info("registering myself: {} with Receptionist", selfName)
       // register to Receptionist so that LoadBalancer is updated with new worker references
@@ -84,15 +82,23 @@ object Worker:
 
           // forward success outcome to LoadBalancer
         case msg @ ExecutionSucceeded(result) =>
-          ctx.log.info(s"{} sending ExecutionSucceeded to {}", selfName, requesterName)
-          requester.foreach(_ ! msg)
+          requester match
+            case Some(requester) =>
+              ctx.log.info(s"{} sending ExecutionSucceeded to {}", selfName, requester.path.name)
+              requester ! msg
+            case None =>
+              ctx.log.warn(s"nobody to reply ExecutionSucceeded to, original requester is empty")
 
           apply(requester = None)
 
         // forward failed outcome to LoadBalancer
         case msg @ ExecutionFailed(reason) =>
-          ctx.log.info(s"{} sending ExecutionFailed to {}", selfName, requesterName)
-          requester.foreach(_ ! msg)
+          requester match
+            case Some(requester) =>
+              ctx.log.info(s"{} sending ExecutionFailed to {}", selfName, requester.path.name)
+              requester ! msg
+            case None =>
+              ctx.log.warn(s"nobody to reply ExecutionFailed to, original requester is empty")
 
           apply(requester = None)
 

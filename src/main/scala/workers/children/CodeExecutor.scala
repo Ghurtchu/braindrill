@@ -17,42 +17,61 @@ object CodeExecutor:
   enum In:
     // received from FileHandler to run the docker process
     case Execute(compiler: String, file: File, replyTo: ActorRef[Worker.In])
+    // piped to self
+    case Executed(output: String, exitCode: Int, replyTo: ActorRef[Worker.In])
+    // piped to self
+    case ExecutionFailed(why: String, replyTo: ActorRef[Worker.In])
 
-  // sent back to FileHandler
-  case class Executed(output: String, exitCode: Int)
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
     import Worker.*
     import ctx.executionContext
-    
+    val selfName = ctx.self.path.name
+    val stateUnchanged = Behaviors.same[CodeExecutor.In]
+
+
     msg match
         // in case Execute is receied
       case In.Execute(compiler, file, replyTo) =>
-        ctx.log.info(s"{} execuding submitted code", ctx.self.path.name)
-        // create docker run commands
-        val asyncExecutionResult = for
-          ps <- execute(Array(compiler, file.getName)) // start docker process
+        ctx.log.info(s"{} executing submitted code", selfName)
+
+        // create run commands
+        val asyncExecutionResult: Future[In.Executed] = for
+          ps <- execute(Array(compiler, file.getName)) // start process
           (asyncSuccess, asyncError) = read(ps.inputReader) -> read(ps.errorReader) // read success and error concurrently
           ((success, error), exitCode) <- asyncSuccess.zip(asyncError).zip(Future(ps.waitFor)) // join success, error and exit code
           _ = Future(file.delete) // remove file in the background to free up the memory
-        yield Executed(
+        yield In.Executed(
           output = if success.nonEmpty then success else error,
-          exitCode = exitCode
+          exitCode = exitCode,
+          replyTo = replyTo
         )
 
-        asyncExecutionResult.onComplete:
-            // in case code executes without issues
-          case Success(Executed(output, _)) =>
-            // respond back normally
-            replyTo ! ExecutionSucceeded(output)
-            // otherwise
-          case Failure(t) =>
-            // indicate why it failed
-            replyTo ! ExecutionFailed(t.toString)
+        ctx.pipeToSelf(asyncExecutionResult):
+          case Success(executed)  => executed
+          case Failure(exception) => In.ExecutionFailed(exception.toString, replyTo)
+
+        Behaviors.same
+
+
+      case In.Executed(output, exitCode, replyTo) =>
+        ctx.log.info(s"{} executed submitted code successfully", selfName)
+        replyTo ! ExecutionSucceeded(output)
 
         Behaviors.stopped
 
-  // starts docker process
+
+      case In.ExecutionFailed(why, replyTo) =>
+        ctx.log.warn(s"{} execution failed due to {}", selfName ,why)
+        replyTo ! ExecutionFailed(why)
+
+        Behaviors.stopped
+
+
+
+
+
+  // starts process
   private def execute(commands: Array[String])(using ec: ExecutionContext) =
     Future(Runtime.getRuntime.exec(commands))
 
