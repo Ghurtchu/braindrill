@@ -2,7 +2,23 @@
 
 Drill your brain, because why the heck not.
 
-The goal of the project is to gain some practical experience using Pekko Cluster, containers, k8s and typed actor concurrency.
+Requirements for deploying locally:
+- docker engine
+
+Running locally:
+- clone the project and navigate to the root directory
+- `docker build -t braindrill .`
+- `docker run -p 8080:8080 braindrill`
+
+Example:
+- sending `POST` request at `localhost:8080/lang/python`
+- attaching `python` code to request body
+
+![My Image](assets/python_example.png)
+
+Supported programming languages:
+- `JavaScript`: `localhost:8080/lang/javascript`
+- `Python`: `localhost:8080/lang/python`
 
 TODO:
 - implement POC - ✅
@@ -14,10 +30,12 @@ TODO:
 - create 3 worker nodes - ✅
 - make worker actors sharded on each node (e.g 25 actors on each node, awaiting tasks) - ✅
 - run cluster within docker containers - ✅
-- run code inside running worker node container - ✅ 
-- enable autoscaling  - ❌ 
-- enable `RoundRobin` load balancing - ❌
+- run code inside running worker node container - ✅
+- add support for Java, C, C++, Go and others - ❌
+- write load tests to check how system behaves during high load - ❌
+- deploy a few pekko-http servers and enable `RoundRobin` load balancing - ❌
 - wrap the cluster in k8s - ❌
+- enable autoscaling  - ❌
 
 Architecture Diagram:
 
