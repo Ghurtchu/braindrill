@@ -25,6 +25,8 @@ object FileHandler:
     import CodeExecutor.In.*
     import ctx.executionContext
 
+    val selfName = ctx.self.path.name
+
     ctx.log.info(s"{}: processing {}", ctx.self.path.name, msg)
     msg match
         // prepared from Worker to prepare file
@@ -46,7 +48,7 @@ object FileHandler:
         val codeExecutor = ctx.spawn(CodeExecutor(), "code-executor")
         // observe it for self-destruction later when the child stops
         ctx.watch(codeExecutor)
-        ctx.log.info("{} prepared file, sending Execute to {}", ctx.self.path.name, codeExecutor.path.name)
+        ctx.log.info("{} prepared file, sending Execute to {}", selfName, codeExecutor.path.name)
         codeExecutor ! Execute(compiler, file, replyTo)
 
         Behaviors.same // state unchanged
@@ -54,7 +56,7 @@ object FileHandler:
       case In.FilePreparationFailed(why, replyTo) =>
         ctx.log.warn(
           "{} failed during file preparation due to {}, sending ExecutionFailed to {}",
-          ctx.self.path.name,
+          selfName,
           why,
           replyTo.path.name
         )
@@ -66,6 +68,6 @@ object FileHandler:
   .receiveSignal:
       // in case Terminated is received
     case (ctx, Terminated(ref)) =>
-      ctx.log.info(s"$ref was stopped, stopping myself too: ${ctx.self}")
+      ctx.log.info(s"{} is stopping because child actor: {} was stopped", ctx.self.path.name, ref.path.name)
       // stopping self, since child also stopped
       Behaviors.stopped

@@ -3,7 +3,6 @@ package workers.children
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import workers.Worker
-import workers.Worker.{ExecutionFailed, ExecutionSucceeded}
 
 import java.io.{BufferedReader, File}
 import scala.annotation.tailrec
@@ -17,26 +16,24 @@ object CodeExecutor:
   enum In:
     // received from FileHandler to run the docker process
     case Execute(compiler: String, file: File, replyTo: ActorRef[Worker.In])
-    // piped to self
+    // piped to self if execution is successful
     case Executed(output: String, exitCode: Int, replyTo: ActorRef[Worker.In])
-    // piped to self
+    // piped to self if execution is failed
     case ExecutionFailed(why: String, replyTo: ActorRef[Worker.In])
 
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
     import Worker.*
     import ctx.executionContext
-    val selfName = ctx.self.path.name
-    val stateUnchanged = Behaviors.same[CodeExecutor.In]
 
+    val selfName = ctx.self.path.name
 
     msg match
-        // in case Execute is receied
       case In.Execute(compiler, file, replyTo) =>
         ctx.log.info(s"{} executing submitted code", selfName)
 
-        // create run commands
-        val asyncExecutionResult: Future[In.Executed] = for
+        // run process async
+        val asyncExecuted = for
           ps <- execute(Array(compiler, file.getName)) // start process
           (asyncSuccess, asyncError) = read(ps.inputReader) -> read(ps.errorReader) // read success and error concurrently
           ((success, error), exitCode) <- asyncSuccess.zip(asyncError).zip(Future(ps.waitFor)) // join success, error and exit code
@@ -47,7 +44,7 @@ object CodeExecutor:
           replyTo = replyTo
         )
 
-        ctx.pipeToSelf(asyncExecutionResult):
+        ctx.pipeToSelf(asyncExecuted):
           case Success(executed)  => executed
           case Failure(exception) => In.ExecutionFailed(exception.toString, replyTo)
 
@@ -56,21 +53,17 @@ object CodeExecutor:
 
       case In.Executed(output, exitCode, replyTo) =>
         ctx.log.info(s"{} executed submitted code successfully", selfName)
-        replyTo ! ExecutionSucceeded(output)
+        replyTo ! Worker.ExecutionSucceeded(output)
 
         Behaviors.stopped
 
 
       case In.ExecutionFailed(why, replyTo) =>
         ctx.log.warn(s"{} execution failed due to {}", selfName ,why)
-        replyTo ! ExecutionFailed(why)
+        replyTo ! Worker.ExecutionFailed(why)
 
         Behaviors.stopped
-
-
-
-
-
+  
   // starts process
   private def execute(commands: Array[String])(using ec: ExecutionContext) =
     Future(Runtime.getRuntime.exec(commands))
