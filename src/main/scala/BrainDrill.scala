@@ -13,8 +13,8 @@ object BrainDrill:
       .foreach:
         deploy("worker", _)
 
-    // deploy single load-balancer
-    deploy("load-balancer", 0)
+    // deploy two load-balancers
+    deploy("master", 0)
 
   private def deploy(role: String, port: Int): Unit =
     // load config with default fallback

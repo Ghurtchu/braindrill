@@ -39,7 +39,7 @@ object ClusterBootstrap:
         ctx.spawn(Worker(), s"Worker$n")
 
     // if it's load balancer node
-    if node hasRole "load-balancer" then
+    if node hasRole "master" then
       given system: ActorSystem[Nothing] = ctx.system
       given timeout: Timeout = Timeout(3.seconds)
       given ec: ExecutionContextExecutor = ctx.executionContext
