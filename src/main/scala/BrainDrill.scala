@@ -13,7 +13,7 @@ object BrainDrill:
       .foreach:
         deploy("worker", _)
 
-    // deploy two load-balancers
+    // deploy single master node
     deploy("master", 0)
 
   private def deploy(role: String, port: Int): Unit =

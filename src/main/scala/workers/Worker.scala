@@ -20,20 +20,19 @@ object Worker:
 
   // incoming messages
   sealed trait In
-  // received from LoadBalancer to start task
-  case class StartExecution(code: String, language: String, replyTo: ActorRef[ExecutionResult]) extends In with CborSerializable
+  // received from LoadBalancer to initiate task
+  final case class StartExecution(code: String, language: String, replyTo: ActorRef[ExecutionResult]) extends In with CborSerializable
 
   // incoming messages received from CodeExecutor
   sealed trait ExecutionResult extends In {
     def value: String
   }
-  // success
-  case class ExecutionSucceeded(value: String) extends ExecutionResult with CborSerializable
-  // failed
-  case class ExecutionFailed(value: String) extends ExecutionResult with CborSerializable
+
+  final case class ExecutionSucceeded(value: String) extends ExecutionResult with CborSerializable
+  final case class ExecutionFailed(value: String)    extends ExecutionResult with CborSerializable
 
   // private data model for grouping execution inputs for docker process
-  private case class ExecutionInputs(compiler: String, extension: String)
+  private final case class ExecutionInputs(compiler: String, extension: String)
 
   // mapping programming language to its inputs
   private val mappings: Map[String, ExecutionInputs] =
@@ -51,43 +50,37 @@ object Worker:
       ctx.system.receptionist ! Receptionist.Register(WorkerServiceKey, ctx.self)
 
       Behaviors.receiveMessage[In]:
-          // if asked to start execution
         case msg @ StartExecution(code, lang, replyTo) =>
           ctx.log.info(s"{} processing StartExecution", selfName)
-          // try reading inputs for programming language
           mappings.get(lang) match
-            // if we have inputs
             case Some(inputs) =>
               // create file handler actor which prepares the file to be executed later
               val fileHandler = ctx.spawn(FileHandler(), s"file-handler")
               ctx.log.info(s"{} sending PrepareFile to {}", selfName, fileHandler.path.name)
-              
-              // send PrepareFile message
+
               fileHandler ! FileHandler.In.PrepareFile(
                 name = s"$lang${Random.nextLong}${inputs.extension}", // random number for avoiding file overwrite/shadowing
                 compiler = inputs.compiler,
                 code = code,
                 replyTo = ctx.self
               )
-              // if there is no mappings
             case None =>
-              // it means programming language is unsupported
               val reason = s"unsupported language: $lang"
-              ctx.log.warn(reason)
+              ctx.log.warn(s"{} failed execution due to: {}", selfName, reason)
 
-              // send back ExecutionFailed with reason
               replyTo ! ExecutionFailed(reason)
 
+          // register original requester
           apply(requester = Some(replyTo))
 
-          // forward success outcome to LoadBalancer
+        // forward successful outcome to LoadBalancer
         case msg @ ExecutionSucceeded(result) =>
           requester match
             case Some(requester) =>
               ctx.log.info(s"{} sending ExecutionSucceeded to {}", selfName, requester.path.name)
               requester ! msg
             case None =>
-              ctx.log.warn(s"nobody to reply ExecutionSucceeded to, original requester is empty")
+              ctx.log.warn(s"there is nobody to reply ExecutionSucceeded to, original requester is empty")
 
           apply(requester = None)
 
@@ -98,7 +91,7 @@ object Worker:
               ctx.log.info(s"{} sending ExecutionFailed to {}", selfName, requester.path.name)
               requester ! msg
             case None =>
-              ctx.log.warn(s"nobody to reply ExecutionFailed to, original requester is empty")
+              ctx.log.warn(s"there is nobody to reply ExecutionFailed to, original requester is empty")
 
           apply(requester = None)
 

@@ -31,8 +31,6 @@ object CodeExecutor:
     msg match
       case In.Execute(compiler, file, replyTo) =>
         ctx.log.info(s"{} executing submitted code", selfName)
-
-        // run process async
         val asyncExecuted = for
           ps <- execute(Array(compiler, file.getName)) // start process
           (asyncSuccess, asyncError) = read(ps.inputReader) -> read(ps.errorReader) // read success and error concurrently
@@ -50,18 +48,18 @@ object CodeExecutor:
 
         Behaviors.same
 
-
       case In.Executed(output, exitCode, replyTo) =>
         ctx.log.info(s"{} executed submitted code successfully", selfName)
         replyTo ! Worker.ExecutionSucceeded(output)
 
+        // stopping myself
         Behaviors.stopped
-
 
       case In.ExecutionFailed(why, replyTo) =>
         ctx.log.warn(s"{} execution failed due to {}", selfName ,why)
         replyTo ! Worker.ExecutionFailed(why)
 
+        // stopping myself, CodeExecutor should decide what to do
         Behaviors.stopped
   
   // starts process

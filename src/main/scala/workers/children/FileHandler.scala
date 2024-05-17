@@ -10,7 +10,7 @@ import scala.concurrent.Future
 import scala.util.*
 
 
-// Actor that prepares the file for before running it
+// Actor that prepares the file before asking CodeExecutor to run it
 object FileHandler:
 
   // incoming messages
@@ -26,17 +26,15 @@ object FileHandler:
     import ctx.executionContext
 
     val selfName = ctx.self.path.name
-
     ctx.log.info(s"{}: processing {}", ctx.self.path.name, msg)
+
     msg match
-        // prepared from Worker to prepare file
       case In.PrepareFile(name, code, compiler, replyTo) =>
         val asyncFile = for
-          file <- Future(File(name)) // create file
-          _    <- Future(Using.resource(PrintWriter(name))(_.write(code))) // write code to it
+          file <- Future(File(name))
+          _    <- Future(Using.resource(PrintWriter(name))(_.write(code)))
         yield file
 
-        // pipe to self
         ctx.pipeToSelf(asyncFile):
           case Success(file) => In.FilePrepared(compiler, file, replyTo)
           case Failure(why)  => In.FilePreparationFailed(why.toString, replyTo)
@@ -51,7 +49,7 @@ object FileHandler:
         ctx.log.info("{} prepared file, sending Execute to {}", selfName, codeExecutor.path.name)
         codeExecutor ! Execute(compiler, file, replyTo)
 
-        Behaviors.same // state unchanged
+        Behaviors.same
 
       case In.FilePreparationFailed(why, replyTo) =>
         ctx.log.warn(
@@ -66,7 +64,6 @@ object FileHandler:
         Behaviors.stopped
 
   .receiveSignal:
-      // in case Terminated is received
     case (ctx, Terminated(ref)) =>
       ctx.log.info(s"{} is stopping because child actor: {} was stopped", ctx.self.path.name, ref.path.name)
       // stopping self, since child also stopped
