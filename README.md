@@ -31,6 +31,7 @@ TODO:
 - run cluster within docker containers - ✅
 - run code inside running worker node container - ✅
 - get rid of `Futures` in actors, use `ctx.ask` or piping to self instead - ✅ 
+- implement extra security measures for docker container to prevent malfunction - ❌ 
 - implement timeouts for long-running code - ❌
 - add support for Java, C, C++, Go and others - ❌
 - write load tests to check how system behaves during high load - ❌
