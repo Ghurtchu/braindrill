@@ -21,7 +21,7 @@ object Worker:
   // incoming messages
   sealed trait In
   // received from LoadBalancer to initiate task
-  final case class StartExecution(code: String, language: String, replyTo: ActorRef[ExecutionResult]) extends In with CborSerializable
+  final case class StartExecution(code: String, language: String, replyTo: ActorRef[cluster.Service.TaskResult]) extends In with CborSerializable
 
   // incoming messages received from CodeExecutor
   sealed trait ExecutionResult extends In {
@@ -41,7 +41,7 @@ object Worker:
       "javascript" -> ExecutionInputs("node", ".js")
     )
 
-  def apply(requester: Option[ActorRef[ExecutionResult]] = None): Behavior[In] =
+  def apply(requester: Option[ActorRef[cluster.Service.TaskResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
       val selfName = ctx.self.path.name
 
@@ -68,7 +68,7 @@ object Worker:
               val reason = s"unsupported language: $lang"
               ctx.log.warn(s"{} failed execution due to: {}", selfName, reason)
 
-              replyTo ! ExecutionFailed(reason)
+              replyTo ! cluster.Service.TaskResult(reason)
 
           // register original requester
           apply(requester = Some(replyTo))
@@ -78,7 +78,7 @@ object Worker:
           requester match
             case Some(requester) =>
               ctx.log.info(s"{} sending ExecutionSucceeded to {}", selfName, requester.path.name)
-              requester ! msg
+              requester ! cluster.Service.TaskResult(result)
             case None =>
               ctx.log.warn(s"there is nobody to reply ExecutionSucceeded to, original requester is empty")
 
@@ -89,7 +89,7 @@ object Worker:
           requester match
             case Some(requester) =>
               ctx.log.info(s"{} sending ExecutionFailed to {}", selfName, requester.path.name)
-              requester ! msg
+              requester ! cluster.Service.TaskResult(reason)
             case None =>
               ctx.log.warn(s"there is nobody to reply ExecutionFailed to, original requester is empty")
 
