@@ -3,6 +3,7 @@ package workers
 import workers.children.FileHandler.In.PrepareFile
 import Worker.In
 import Worker.ExecutionSucceeded
+import loadbalancer.WorkDelegator
 import org.apache.pekko.actor.typed.receptionist.{Receptionist, ServiceKey}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -21,7 +22,7 @@ object Worker:
   // incoming messages
   sealed trait In
   // received from LoadBalancer to initiate task
-  final case class StartExecution(code: String, language: String, replyTo: ActorRef[cluster.Service.TaskResult]) extends In with CborSerializable
+  final case class StartExecution(code: String, language: String, replyTo: ActorRef[WorkDelegator.TaskResult]) extends In with CborSerializable
 
   // incoming messages received from CodeExecutor
   sealed trait ExecutionResult extends In {
@@ -41,7 +42,7 @@ object Worker:
       "javascript" -> ExecutionInputs("node", ".js")
     )
 
-  def apply(requester: Option[ActorRef[cluster.Service.TaskResult]] = None): Behavior[In] =
+  def apply(requester: Option[ActorRef[WorkDelegator.TaskResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
       val selfName = ctx.self.path.name
 
@@ -68,7 +69,7 @@ object Worker:
               val reason = s"unsupported language: $lang"
               ctx.log.warn(s"{} failed execution due to: {}", selfName, reason)
 
-              replyTo ! cluster.Service.TaskResult(reason)
+              replyTo ! loadbalancer.WorkDelegator.TaskResult(reason)
 
           // register original requester
           apply(requester = Some(replyTo))
@@ -78,7 +79,7 @@ object Worker:
           requester match
             case Some(requester) =>
               ctx.log.info(s"{} sending ExecutionSucceeded to {}", selfName, requester.path.name)
-              requester ! cluster.Service.TaskResult(result)
+              requester ! loadbalancer.WorkDelegator.TaskResult(result)
             case None =>
               ctx.log.warn(s"there is nobody to reply ExecutionSucceeded to, original requester is empty")
 
@@ -89,7 +90,7 @@ object Worker:
           requester match
             case Some(requester) =>
               ctx.log.info(s"{} sending ExecutionFailed to {}", selfName, requester.path.name)
-              requester ! cluster.Service.TaskResult(reason)
+              requester ! loadbalancer.WorkDelegator.TaskResult(reason)
             case None =>
               ctx.log.warn(s"there is nobody to reply ExecutionFailed to, original requester is empty")
 

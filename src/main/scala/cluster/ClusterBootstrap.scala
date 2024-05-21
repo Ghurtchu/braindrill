@@ -1,8 +1,8 @@
 package cluster
 
+import loadbalancer.WorkDelegator.In
+import loadbalancer.{LoadBalancer, WorkDelegator}
 import workers.Worker
-import workers.Worker.In
-// import loadbalancer.LoadBalancer
 import org.apache.pekko
 import org.apache.pekko.actor.typed.receptionist.Receptionist
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -18,7 +18,6 @@ import pekko.actor.typed.scaladsl.*
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.*
-import scala.util.Random.shuffle
 import scala.util.*
 
 object ClusterBootstrap:
@@ -28,45 +27,42 @@ object ClusterBootstrap:
     val cfg = ctx.system.settings.config
 
     if node hasRole "worker" then
-      // on every compute node there is one service instance that delegates to N local workers
+      // number of workers on each node, let's say n = 50
       val numberOfWorkers = Try(cfg.getInt("transformation.workers-per-node")).getOrElse(10)
+      // router pool which has access to available n workers with round robing routing
       val workers: ActorRef[Worker.StartExecution] = ctx.spawn(
-        Routers.pool(numberOfWorkers)(Worker().narrow[Worker.StartExecution]).withRoundRobinRouting(),
+        behavior = Routers.pool(numberOfWorkers)(Worker().narrow[Worker.StartExecution]).withRoundRobinRouting(),
         "WorkerRouter"
       )
+      // on every "worker" node there is one WorkDelegator instance that delegates to N local workers
+      val workDelegator: ActorRef[WorkDelegator.In] = ctx.spawn(WorkDelegator(workers), "WorkDelegator")
 
-      val svc = ctx.spawn(Service(workers), "Service")
-
-      ctx.system.receptionist ! Receptionist.Register(Service.Key, svc)
-
-      // on every compute node there is one service instance that delegates to N local workers
+      // register WorkDistributor.Key events to system receptionist
+      ctx.system.receptionist ! Receptionist.Register(WorkDelegator.Key, workDelegator)
 
     if node hasRole "master" then
       given system: ActorSystem[Nothing] = ctx.system
       given timeout: Timeout = Timeout(3.seconds)
       given ec: ExecutionContextExecutor = ctx.executionContext
 
-      val serviceRouter =
-        ctx.spawn(Routers.group(Service.Key), "ServiceRouter")
+      // actor reference which routes AssignTask message to WorkDelegator
+      val workDelegator: ActorRef[WorkDelegator.In.AssignTask] = ctx.spawn(
+          Routers.group(WorkDelegator.Key).withRoundRobinRouting(),
+          "WorkDelegatorRouter"
+        )
 
-      val client: ActorRef[Client.In] = ctx.spawn(Client(serviceRouter), "Client")
-
-      // ignore
-//      val loadBalancerAmount = Try(cfg.getInt("transformation.load-balancer")).getOrElse(2)
-//      val loadBalancers = (1 to loadBalancerAmount).map: n =>
-//        ctx.spawn(LoadBalancer(), s"LoadBalancer-$n")
+      val loadBalancer = ctx.spawn(LoadBalancer(workDelegator), "LoadBalancer")
 
       val route =
         pathPrefix("lang" / Segment): lang =>
           post:
             entity(as[String]): code =>
-              // val loadBalancer = shuffle(loadBalancers).head
-              val asyncExecutionResponse = client
-                .ask[Service.TaskResult](Client.In.AssignTask(code, lang, _))
+              val asyncResponse = loadBalancer
+                .ask[WorkDelegator.TaskResult](LoadBalancer.In.AssignTask(code, lang, _))
                 .map(_.output)
                 .recover(_ => "something went wrong") // TODO: make better recovery
 
-              complete(asyncExecutionResponse)
+              complete(asyncResponse)
 
       val (host, port) = ("0.0.0.0", 8080) // TODO: make them configurable
 
