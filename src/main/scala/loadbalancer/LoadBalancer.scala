@@ -14,14 +14,14 @@ object LoadBalancer {
     final case class AssignTask(code: String, language: String, replyTo: ActorRef[Worker.ExecutionResult]) extends In with CborSerializable
     final case class Response(result: Worker.ExecutionResult) extends In with CborSerializable
 
-  def apply(workDelegator: ActorRef[WorkDelegator.In.DelegateWork]): Behavior[In] =
+  def apply(workDelegatorPool: ActorRef[WorkDelegator.In.DelegateWork]): Behavior[In] =
     Behaviors.setup { ctx =>
       val responseAdapter: ActorRef[Worker.ExecutionResult] = ctx.messageAdapter(In.Response.apply)
 
       def behavior(requester: Option[ActorRef[Worker.ExecutionResult]] = None): Behavior[In] = {
         Behaviors.receiveMessage {
           case In.AssignTask(code, language, replyTo: ActorRef[Worker.ExecutionResult]) =>
-            workDelegator ! WorkDelegator.In.DelegateWork(code, language, responseAdapter)
+            workDelegatorPool ! WorkDelegator.In.DelegateWork(code, language, responseAdapter)
 
             behavior(Some(replyTo))
 

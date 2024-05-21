@@ -26,6 +26,7 @@ object FileHandler:
     import ctx.executionContext
 
     val selfName = ctx.self.path.name
+    
     ctx.log.info(s"{}: processing {}", ctx.self.path.name, msg)
 
     msg match

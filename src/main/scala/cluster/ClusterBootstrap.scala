@@ -20,6 +20,17 @@ import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.*
 import scala.util.*
 
+/**
+ * The group routers relies on the Receptionist and will therefore route messages to services registered in any node of the cluster.
+ */
+
+/**
+ * each "worker" node starts a WorkDelegator that distributes work over N local Workers.
+ * The "master" node then message the WorkDelegator instances through a group router.
+ * The router finds WorkDelegator-s by subscribing to the cluster receptionist and a service key - WorkDelegator.Key.
+ * Each WorkDelegator is registered to the receptionist when started.
+ */
+
 object ClusterBootstrap:
   def apply(): Behavior[Nothing] = Behaviors.setup[Nothing]: ctx =>
     val cluster = Cluster(ctx.system)
@@ -30,14 +41,17 @@ object ClusterBootstrap:
       // number of workers on each node, let's say n = 50
       val numberOfWorkers = Try(cfg.getInt("transformation.workers-per-node")).getOrElse(10)
       // router pool which has access to available n workers with round robing routing
-      val workers: ActorRef[Worker.StartExecution] = ctx.spawn(
+      // pool of Workers or ActorRef[Worker.StartExecution] - actor ref that handles Worker.StartExecution message
+      val workersPool: ActorRef[Worker.StartExecution] = ctx.spawn( // let's say 10 workers
         behavior = Routers.pool(numberOfWorkers)(Worker().narrow[Worker.StartExecution]).withRoundRobinRouting(),
-        "WorkerRouter"
+        "WorkersPool"
       )
-      // on every "worker" node there is one WorkDelegator instance that delegates to N local workers
-      val workDelegator: ActorRef[WorkDelegator.In] = ctx.spawn(WorkDelegator(workers), "WorkDelegator")
+      // on every "worker" node there is only one WorkDelegator instance that delegates to N local workers
+      val workDelegator: ActorRef[WorkDelegator.In] = ctx.spawn(WorkDelegator(workersPool), "WorkDelegator")
 
-      // register WorkDistributor.Key events to system receptionist
+      // ActorRefs are registered to the receptionist using a ServiceKey
+      // so all WorkDelegator-s will be registered to ClusterBootstrap actor system receptionist
+      // when the node starts it registers itself to Receptionist, so that "master" node can have access to remote WorkDelegator
       ctx.system.receptionist ! Receptionist.Register(WorkDelegator.Key, workDelegator)
 
     if node hasRole "master" then
@@ -45,13 +59,14 @@ object ClusterBootstrap:
       given timeout: Timeout = Timeout(3.seconds)
       given ec: ExecutionContextExecutor = ctx.executionContext
 
-      // actor reference which routes AssignTask message to WorkDelegator
-      val workDelegator: ActorRef[WorkDelegator.In.DelegateWork] = ctx.spawn(
+      // ActorRef which routes AssignTask message to any WorkDelegator on any node, with round robin balancing
+      // random reference of WorkDelegator - selected by round robin algorithm
+      val workDelegatorPool: ActorRef[WorkDelegator.In.DelegateWork] = ctx.spawn( // let's say 3 WorkerDelegators due to 3 nodes
           Routers.group(WorkDelegator.Key).withRoundRobinRouting(),
-          "WorkDelegatorRouter"
+          "WorkDelegatorPool"
         )
 
-      val loadBalancer = ctx.spawn(LoadBalancer(workDelegator), "LoadBalancer")
+      val loadBalancer = ctx.spawn(LoadBalancer(workDelegatorPool), "LoadBalancer")
 
       val route =
         pathPrefix("lang" / Segment): lang =>

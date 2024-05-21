@@ -1,23 +1,15 @@
 package workers
 
 import workers.children.FileHandler.In.PrepareFile
-import Worker.In
-import Worker.ExecutionSucceeded
-import loadbalancer.WorkDelegator
-import org.apache.pekko.actor.typed.receptionist.{Receptionist, ServiceKey}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import serialization.CborSerializable
 import workers.children.FileHandler
 
-import java.io.File
 import scala.util.*
 
 // Worker actor that initiates the code execution task
 object Worker:
-
-  // service key for Receptionist events
-  val WorkerServiceKey = ServiceKey[Worker.StartExecution]("Worker")
 
   // incoming messages
   sealed trait In
@@ -45,10 +37,6 @@ object Worker:
   def apply(requester: Option[ActorRef[Worker.ExecutionResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
       val selfName = ctx.self.path.name
-
-      ctx.log.info("registering myself: {} with Receptionist", selfName)
-      // register to Receptionist so that LoadBalancer is updated with new worker references
-      ctx.system.receptionist ! Receptionist.Register(WorkerServiceKey, ctx.self)
 
       Behaviors.receiveMessage[In]:
         case msg @ StartExecution(code, lang, replyTo) =>

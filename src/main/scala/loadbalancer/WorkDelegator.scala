@@ -16,14 +16,14 @@ object WorkDelegator {
   object In:
     case class DelegateWork(code: String, language: String, replyTo: ActorRef[Worker.ExecutionResult]) extends In with CborSerializable
 
-  def apply(workers: ActorRef[Worker.StartExecution]): Behavior[WorkDelegator.In] = {
+  def apply(workersPool: ActorRef[Worker.StartExecution]): Behavior[WorkDelegator.In] = {
     Behaviors.setup { ctx =>
       // if all workers would crash/stop we want to stop as well
-      ctx.watch(workers)
+      ctx.watch(workersPool)
 
       Behaviors.receiveMessage:
         case msg: In.DelegateWork =>
-          workers ! Worker.StartExecution(
+          workersPool ! Worker.StartExecution(
             code = msg.code,
             language = msg.language,
             replyTo = msg.replyTo
