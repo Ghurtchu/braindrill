@@ -22,7 +22,7 @@ object Worker:
   // incoming messages
   sealed trait In
   // received from LoadBalancer to initiate task
-  final case class StartExecution(code: String, language: String, replyTo: ActorRef[WorkDelegator.TaskResult]) extends In with CborSerializable
+  final case class StartExecution(code: String, language: String, replyTo: ActorRef[Worker.ExecutionResult]) extends In with CborSerializable
 
   // incoming messages received from CodeExecutor
   sealed trait ExecutionResult extends In {
@@ -42,7 +42,7 @@ object Worker:
       "javascript" -> ExecutionInputs("node", ".js")
     )
 
-  def apply(requester: Option[ActorRef[WorkDelegator.TaskResult]] = None): Behavior[In] =
+  def apply(requester: Option[ActorRef[Worker.ExecutionResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
       val selfName = ctx.self.path.name
 
@@ -69,7 +69,7 @@ object Worker:
               val reason = s"unsupported language: $lang"
               ctx.log.warn(s"{} failed execution due to: {}", selfName, reason)
 
-              replyTo ! loadbalancer.WorkDelegator.TaskResult(reason)
+              replyTo ! Worker.ExecutionFailed(reason)
 
           // register original requester
           apply(requester = Some(replyTo))
@@ -79,7 +79,7 @@ object Worker:
           requester match
             case Some(requester) =>
               ctx.log.info(s"{} sending ExecutionSucceeded to {}", selfName, requester.path.name)
-              requester ! loadbalancer.WorkDelegator.TaskResult(result)
+              requester ! msg
             case None =>
               ctx.log.warn(s"there is nobody to reply ExecutionSucceeded to, original requester is empty")
 
@@ -90,7 +90,7 @@ object Worker:
           requester match
             case Some(requester) =>
               ctx.log.info(s"{} sending ExecutionFailed to {}", selfName, requester.path.name)
-              requester ! loadbalancer.WorkDelegator.TaskResult(reason)
+              requester ! msg
             case None =>
               ctx.log.warn(s"there is nobody to reply ExecutionFailed to, original requester is empty")
 

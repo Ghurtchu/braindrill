@@ -46,7 +46,7 @@ object ClusterBootstrap:
       given ec: ExecutionContextExecutor = ctx.executionContext
 
       // actor reference which routes AssignTask message to WorkDelegator
-      val workDelegator: ActorRef[WorkDelegator.In.AssignTask] = ctx.spawn(
+      val workDelegator: ActorRef[WorkDelegator.In.DelegateWork] = ctx.spawn(
           Routers.group(WorkDelegator.Key).withRoundRobinRouting(),
           "WorkDelegatorRouter"
         )
@@ -58,8 +58,8 @@ object ClusterBootstrap:
           post:
             entity(as[String]): code =>
               val asyncResponse = loadBalancer
-                .ask[WorkDelegator.TaskResult](LoadBalancer.In.AssignTask(code, lang, _))
-                .map(_.output)
+                .ask[Worker.ExecutionResult](LoadBalancer.In.AssignTask(code, lang, _))
+                .map(_.value)
                 .recover(_ => "something went wrong") // TODO: make better recovery
 
               complete(asyncResponse)
