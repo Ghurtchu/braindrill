@@ -33,12 +33,12 @@ object ClusterBootstrap:
           Behaviors.supervise(Worker().narrow[Worker.StartExecution])
             .onFailure(SupervisorStrategy.restart)
         } .withRoundRobinRouting(),
-        "worker-router"
+        name = "worker-router"
       )
 
       // ActorRefs are registered to the receptionist using a ServiceKey
       // so all remote worker-router-s will be registered to ClusterBootstrap actor system receptionist
-      // when the node starts it registers the local worker-router to the system Receptionist 
+      // when the node starts it registers the local worker-router to the system Receptionist
       // so that "master" node can have access to remote worker-router later
       ctx.system.receptionist ! Receptionist.Register(Worker.WorkerRouterKey, workerRouter)
 
@@ -50,9 +50,11 @@ object ClusterBootstrap:
       val numberOfLoadBalancers = Try(cfg.getInt("transformation.load-balancer")).getOrElse(2)
 
       // pool of load balancers that forward StartExecution message to the remote worker-router actors in a round robin fashion
-      val loadBalancers = Vector.fill(numberOfLoadBalancers)(
-        ctx.spawnAnonymous(Routers.group(Worker.WorkerRouterKey).withRoundRobinRouting())
-      )
+      val loadBalancers = (1 to numberOfLoadBalancers).map: n =>
+        ctx.spawn(
+          behavior = Routers.group(Worker.WorkerRouterKey).withRoundRobinRouting(),
+          name = s"load-balancer-$n"
+        )
 
       val route =
         pathPrefix("lang" / Segment): lang =>

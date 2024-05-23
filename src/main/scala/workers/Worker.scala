@@ -39,7 +39,7 @@ object Worker:
 
   def apply(requester: Option[ActorRef[Worker.ExecutionResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
-      val selfName = ctx.self.path.name
+      val selfName = ctx.self
 
       Behaviors.receiveMessage[In]:
         case msg @ StartExecution(code, lang, replyTo) =>
@@ -48,7 +48,7 @@ object Worker:
             case Some(inputs) =>
               // create file handler actor which prepares the file to be executed later
               val fileHandler = ctx.spawn(FileHandler(), s"file-handler")
-              ctx.log.info(s"{} sending PrepareFile to {}", selfName, fileHandler.path.name)
+              ctx.log.info(s"{} sending PrepareFile to {}", selfName, fileHandler)
 
               fileHandler ! FileHandler.In.PrepareFile(
                 name = s"$lang${Random.nextLong}${inputs.extension}", // random number for avoiding file overwrite/shadowing
@@ -69,7 +69,7 @@ object Worker:
         case msg @ ExecutionSucceeded(result) =>
           requester match
             case Some(requester) =>
-              ctx.log.info(s"{} sending ExecutionSucceeded to {}", selfName, requester.path.name)
+              ctx.log.info(s"{} sending ExecutionSucceeded to {}", selfName, requester)
               requester ! msg
             case None =>
               ctx.log.warn(s"there is nobody to reply ExecutionSucceeded to, original requester is empty")
@@ -80,7 +80,7 @@ object Worker:
         case msg @ ExecutionFailed(reason) =>
           requester match
             case Some(requester) =>
-              ctx.log.info(s"{} sending ExecutionFailed to {}", selfName, requester.path.name)
+              ctx.log.info(s"{} sending ExecutionFailed to {}", selfName, requester)
               requester ! msg
             case None =>
               ctx.log.warn(s"there is nobody to reply ExecutionFailed to, original requester is empty")

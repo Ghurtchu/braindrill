@@ -26,7 +26,7 @@ object CodeExecutor:
     import Worker.*
     import ctx.executionContext
 
-    val selfName = ctx.self.path.name
+    val selfName = ctx.self
 
     msg match
       case In.Execute(compiler, file, replyTo) =>
