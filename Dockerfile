@@ -5,8 +5,7 @@ FROM hseeberger/scala-sbt:17.0.2_1.6.2_3.1.1
 RUN apt-get update
 
 # python runtime
-RUN apt-get install -y python
-RUN apt-get install -y pip
+RUN apt-get install -y python3
 
 # javascript runtime
 ENV NODE_VERSION=16.13.0
