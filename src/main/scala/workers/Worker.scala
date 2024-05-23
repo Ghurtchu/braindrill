@@ -33,8 +33,10 @@ object Worker:
   // mapping programming language to its inputs
   private val mappings: Map[String, ExecutionInputs] =
     Map(
-      "python" -> ExecutionInputs("python", ".py"),
-      "javascript" -> ExecutionInputs("node", ".js")
+      "scala" -> ExecutionInputs("scala", ".scala"),
+      "java" -> ExecutionInputs("java", ".java"),
+      "python" -> ExecutionInputs("python3", ".py"),
+      "javascript" -> ExecutionInputs("node", ".js"),
     )
 
   def apply(requester: Option[ActorRef[Worker.ExecutionResult]] = None): Behavior[In] =

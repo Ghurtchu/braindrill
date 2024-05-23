@@ -17,8 +17,36 @@ Example:
 ![My Image](assets/python_example.png)
 
 Supported programming languages:
-- `JavaScript`: `localhost:8080/lang/javascript`
-- `Python`: `localhost:8080/lang/python`
+- `Scala 3.1.1`: `localhost:8080/lang/scala`
+- `Java 17`: `localhost:8080/lang/java`
+- `Python 3`: `localhost:8080/lang/python`
+- `JavaScript / Node 16`: `localhost:8080/lang/javascript`
+
+Simple code snippets for testing:
+
+- `Scala`
+```scala
+@main def hello(): Unit = println("drill my brain")
+```
+
+- `Java`
+```java
+public class BrainDrill {
+    public static void main(String[] args) {
+        System.out.println("drill my brain");
+    }
+}
+```
+
+- `Python`
+```python
+print("drill my brain") 
+```
+
+- `JavaScript`:
+```javascript
+console.log("drill my brain");
+```
 
 TODO:
 - implement POC - ✅
@@ -34,7 +62,7 @@ TODO:
 - use other `pekko` libraries to make cluster bootstrapping and management flexible and configurable - ❌
 - implement extra security measures for docker container to prevent malfunction - ❌
 - write load tests to check how system behaves during high load - ❌
-- add support for Java, C, C++, Go and others - ❌
+- add support for C, C++, Go and others - ❌
 - deploy a few pekko-http servers and enable `RoundRobin` load balancing - ❌
 - wrap the cluster in k8s - ❌
 - enable autoscaling  - ❌
