@@ -25,6 +25,7 @@ object CodeExecutor:
     case Executed(output: String, exitCode: Int, replyTo: ActorRef[Worker.In])
     // piped to self if execution is failed
     case ExecutionFailed(why: String, replyTo: ActorRef[Worker.In])
+    case ExecutionSucceeded(output: String, replyTo: ActorRef[Worker.In])
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
     import Worker.*
@@ -51,13 +52,12 @@ object CodeExecutor:
           case Success(executed)  =>
             executed.exitCode match
               case 124 => In.ExecutionFailed("The process was terminated because it exceeded the timeout", replyTo)
-              case _   => executed
-          case Failure(exception) =>
-            In.ExecutionFailed(exception.toString, replyTo)
+              case _   => In.ExecutionSucceeded(executed.output, replyTo)
+          case Failure(exception) => In.ExecutionFailed(exception.toString, replyTo)
 
         Behaviors.same
 
-      case In.Executed(output, exitCode, replyTo) =>
+      case In.ExecutionSucceeded(output, replyTo) =>
         ctx.log.info(s"{} executed submitted code successfully", selfName)
         replyTo ! Worker.ExecutionSucceeded(output)
 
