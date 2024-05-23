@@ -1,6 +1,6 @@
 package workers.children
 
-import org.apache.pekko.actor.{ActorSystem, ClassicActorSystemProvider}
+import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -9,10 +9,9 @@ import workers.Worker
 import workers.children.CodeExecutor.In
 
 import java.io.{BufferedReader, File}
-import java.util.concurrent.TimeUnit
 import scala.annotation.tailrec
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.*
 
 // Actor that executes the submitted code and returns the success/failed output
@@ -64,7 +63,7 @@ object CodeExecutor:
 
         Behaviors.stopped
 
-      case msg @ In.ExecutionFailed(why, replyTo) =>
+      case In.ExecutionFailed(why, replyTo) =>
         ctx.log.warn(s"{} execution failed due to {}", selfName ,why)
         replyTo ! Worker.ExecutionFailed(why)
 
