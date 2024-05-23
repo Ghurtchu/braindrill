@@ -1,7 +1,5 @@
 package cluster
 
-import loadbalancer.WorkDelegator.In
-import loadbalancer.{LoadBalancer, WorkDelegator}
 import workers.Worker
 import org.apache.pekko
 import org.apache.pekko.actor.typed.receptionist.Receptionist
@@ -15,21 +13,11 @@ import pekko.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
 import pekko.actor.typed.scaladsl.AskPattern.Askable
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
+import workers.Worker.*
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.*
 import scala.util.*
-
-/**
- * The group routers relies on the Receptionist and will therefore route messages to services registered in any node of the cluster.
- */
-
-/**
- * each "worker" node starts a WorkDelegator that distributes work over N local Workers.
- * The "master" node then message the WorkDelegator instances through a group router.
- * The router finds WorkDelegator-s by subscribing to the cluster receptionist and a service key - WorkDelegator.Key.
- * Each WorkDelegator is registered to the receptionist when started.
- */
 
 object ClusterBootstrap:
   def apply(): Behavior[Nothing] = Behaviors.setup[Nothing]: ctx =>
@@ -38,42 +26,41 @@ object ClusterBootstrap:
     val cfg = ctx.system.settings.config
 
     if node hasRole "worker" then
-      // number of workers on each node, let's say n = 50
-      val numberOfWorkers = Try(cfg.getInt("transformation.workers-per-node")).getOrElse(10)
-      // router pool which has access to available n workers with round robing routing
-      // pool of Workers or ActorRef[Worker.StartExecution] - actor ref that handles Worker.StartExecution message
-      val workersPool: ActorRef[Worker.StartExecution] = ctx.spawn( // let's say 10 workers
-        behavior = Routers.pool(numberOfWorkers)(Worker().narrow[Worker.StartExecution]).withRoundRobinRouting(),
-        "WorkersPool"
+      val numberOfWorkers = Try(cfg.getInt("transformation.workers-per-node")).getOrElse(50)
+      // actor that forwards StartExecution messages to local Worker actors in a round robin fashion
+      val workerRouter = ctx.spawn(
+        behavior = Routers.pool(numberOfWorkers) {
+          Behaviors.supervise(Worker().narrow[Worker.StartExecution])
+            .onFailure(SupervisorStrategy.restart)
+        } .withRoundRobinRouting(),
+        "worker-router"
       )
-      // on every "worker" node there is only one WorkDelegator instance that delegates to N local workers
-      val workDelegator: ActorRef[WorkDelegator.In] = ctx.spawn(WorkDelegator(workersPool), "WorkDelegator")
 
       // ActorRefs are registered to the receptionist using a ServiceKey
-      // so all WorkDelegator-s will be registered to ClusterBootstrap actor system receptionist
-      // when the node starts it registers itself to Receptionist, so that "master" node can have access to remote WorkDelegator
-      ctx.system.receptionist ! Receptionist.Register(WorkDelegator.Key, workDelegator)
+      // so all remote worker-router-s will be registered to ClusterBootstrap actor system receptionist
+      // when the node starts it registers the local worker-router to the system Receptionist 
+      // so that "master" node can have access to remote worker-router later
+      ctx.system.receptionist ! Receptionist.Register(Worker.WorkerRouterKey, workerRouter)
 
     if node hasRole "master" then
       given system: ActorSystem[Nothing] = ctx.system
       given timeout: Timeout = Timeout(3.seconds)
       given ec: ExecutionContextExecutor = ctx.executionContext
 
-      // ActorRef which routes AssignTask message to any WorkDelegator on any node, with round robin balancing
-      // random reference of WorkDelegator - selected by round robin algorithm
-      val workDelegatorPool: ActorRef[WorkDelegator.In.DelegateWork] = ctx.spawn( // let's say 3 WorkerDelegators due to 3 nodes
-          Routers.group(WorkDelegator.Key).withRoundRobinRouting(),
-          "WorkDelegatorPool"
-        )
+      val numberOfLoadBalancers = Try(cfg.getInt("transformation.load-balancer")).getOrElse(2)
 
-      val loadBalancer = ctx.spawn(LoadBalancer(workDelegatorPool), "LoadBalancer")
+      // pool of load balancers that forward StartExecution message to the remote worker-router actors in a round robin fashion
+      val loadBalancers = Vector.fill(numberOfLoadBalancers)(
+        ctx.spawnAnonymous(Routers.group(Worker.WorkerRouterKey).withRoundRobinRouting())
+      )
 
       val route =
         pathPrefix("lang" / Segment): lang =>
           post:
             entity(as[String]): code =>
+              val loadBalancer = Random.shuffle(loadBalancers).head
               val asyncResponse = loadBalancer
-                .ask[Worker.ExecutionResult](LoadBalancer.In.AssignTask(code, lang, _))
+                .ask[ExecutionResult](StartExecution(code, lang, _))
                 .map(_.value)
                 .recover(_ => "something went wrong") // TODO: make better recovery
 

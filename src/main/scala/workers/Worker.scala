@@ -1,5 +1,6 @@
 package workers
 
+import org.apache.pekko.actor.typed.receptionist.ServiceKey
 import workers.children.FileHandler.In.PrepareFile
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -10,6 +11,8 @@ import scala.util.*
 
 // Worker actor that initiates the code execution task
 object Worker:
+
+  val WorkerRouterKey = ServiceKey[Worker.StartExecution]("worker-router.StartExecution")
 
   // incoming messages
   sealed trait In
