@@ -29,13 +29,12 @@ TODO:
 - create 3 worker nodes - ✅
 - make worker actors sharded on each node (e.g 25 actors on each node, awaiting tasks) - ✅
 - run cluster within docker containers - ✅
-- run code inside running worker node container - ✅
-- get rid of `Futures` in actors, use `ctx.ask` or piping to self instead - ✅ 
-- implement extra security measures for docker container to prevent malfunction - ❌ 
-- implement timeouts & cleanup for long-running code - ❌
-- add support for Java, C, C++, Go and others - ❌
-- write load tests to check how system behaves during high load - ❌
+- run code inside running worker node container - ✅ 
+- implement timeouts & cleanup for long-running code - ✅
 - use other `pekko` libraries to make cluster bootstrapping and management flexible and configurable - ❌
+- implement extra security measures for docker container to prevent malfunction - ❌
+- write load tests to check how system behaves during high load - ❌
+- add support for Java, C, C++, Go and others - ❌
 - deploy a few pekko-http servers and enable `RoundRobin` load balancing - ❌
 - wrap the cluster in k8s - ❌
 - enable autoscaling  - ❌
