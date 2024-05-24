@@ -1,30 +1,19 @@
 
-import cluster.ClusterBootstrap
+import cluster.ClusterSystem
 import com.typesafe.config.ConfigFactory
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 
-object BrainDrill:
+import scala.util.Try
 
-  def main(args: Array[String]): Unit =
-    // 3 workers nodes
-    Iterator
-      .iterate(17356)(_ + 1)
-      .take(3)
-      .foreach:
-        deploy("worker", _)
+object BrainDrill extends App:
 
-    // single master node
-    deploy("master", 0)
+  val cfg = ConfigFactory.load()
+  val clusterName = Try(cfg.getString("clustering.cluster.name"))
+    .getOrElse("ClusterSystem")
 
-  private def deploy(role: String, port: Int): Unit =
-    val cfg = ConfigFactory
-      .parseString(
-        s"""
-          pekko.remote.artery.canonical.port=$port
-          pekko.cluster.roles = [$role]
-
-          """)
-      .withFallback(ConfigFactory.load("transformation"))
-
-    ActorSystem[Nothing](ClusterBootstrap(), "ClusterSystem", cfg)
+  ActorSystem[Nothing](
+    guardianBehavior = ClusterSystem(),
+    name = clusterName,
+    config = cfg
+  )

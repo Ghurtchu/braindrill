@@ -1,0 +1,53 @@
+version: '3'
+services:
+  master:
+    build:
+      dockerfile: Dockerfile
+    container_name: 'master'
+    ports:
+      - '1600:1600'
+      - '8080:8080'
+    environment:
+      CLUSTER_IP: 'master'
+      CLUSTER_PORT: '1600'
+      CLUSTER_ROLE: 'master'
+      SEED_IP: 'master'
+  worker-1:
+    build:
+      dockerfile: Dockerfile
+    ports:
+      - '17350:17350'
+    security_opt:
+      - 'seccomp=unconfined'
+    environment:
+      CLUSTER_IP: 'worker-1'
+      CLUSTER_PORT: '17350'
+      CLUSTER_ROLE: 'worker'
+      SEED_IP: 'master'
+      SEED_PORT: '1600'
+  worker-2:
+    build:
+      dockerfile: Dockerfile
+    ports:
+      - '17351:17351'
+    security_opt:
+      - 'seccomp=unconfined'
+    environment:
+      CLUSTER_IP: 'worker-2'
+      CLUSTER_PORT: '17351'
+      CLUSTER_ROLE: 'worker'
+      SEED_IP: 'master'
+      SEED_PORT: '1600'
+  worker-3:
+    build:
+      dockerfile: Dockerfile
+    ports:
+      - '17352:17352'
+    security_opt:
+      - 'seccomp=unconfined'
+    environment:
+      CLUSTER_IP: 'worker-3'
+      CLUSTER_PORT: '17352'
+      CLUSTER_ROLE: 'worker'
+      SEED_IP: 'master'
+      SEED_PORT: '1600'

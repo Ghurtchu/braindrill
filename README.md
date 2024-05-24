@@ -7,8 +7,7 @@ Requirements for deploying locally:
 
 Running locally:
 - clone the project and navigate to the root directory
-- `docker build -t braindrill .`
-- `docker run -p 8080:8080 --cpus="2" --memory="1024m" --security-opt seccomp:unconfined braindrill`
+- `docker-compose up`
 
 Example:
 - sending `POST` request at `localhost:8080/lang/python`

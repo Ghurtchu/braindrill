@@ -2,6 +2,7 @@ ThisBuild / scalaVersion := "3.4.1"
 
 val PekkoVersion = "1.0.2"
 val PekkoHttpVersion = "1.0.1"
+val PekkoManagementVersion = "1.0.0"
 
 assembly / assemblyMergeStrategy := {
   case PathList("META-INF", "versions", "9", "module-info.class") => MergeStrategy.discard
@@ -25,6 +26,11 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-cluster-typed" % PekkoVersion,
   "org.apache.pekko" %% "pekko-serialization-jackson" % PekkoVersion,
   "ch.qos.logback" % "logback-classic" % "1.5.6"
+)
+
+libraryDependencies ++= Seq(
+  "org.apache.pekko" %% "pekko-management-cluster-bootstrap" % PekkoManagementVersion,
+  "org.apache.pekko" %% "pekko-discovery" % PekkoVersion
 )
 
 lazy val root = (project in file("."))
