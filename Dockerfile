@@ -28,6 +28,5 @@ COPY . /app
 # Build the Scala project
 RUN sbt clean assembly
 
-
 # Run application when the container launches
 CMD ["java", "-jar", "target/scala-3.4.1/braindrill.jar"]

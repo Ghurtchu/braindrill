@@ -50,14 +50,14 @@ object CodeExecutor:
 
         ctx.pipeToSelf(asyncExecuted):
           case Success(executed)  =>
-            ctx.log.info("[SUCCESS OUTPUT]: {}", executed)
+            ctx.log.info("[SUCCESS]: {}", executed)
             executed.exitCode match
-              case 124 => In.ExecutionFailed("The process was terminated because it exceeded the timeout", replyTo)
-              case 137 => In.ExecutionFailed("The code is using too much memory", replyTo)
+              case 124 => In.ExecutionFailed("The process was aborted because it exceeded the timeout", replyTo)
+              case 137 => In.ExecutionFailed("The process was aborted because it exceeded the memory usage", replyTo)
               case _   => In.ExecutionSucceeded(executed.output, replyTo)
           case Failure(exception) =>
-            ctx.log.info("[FAILURE OUTPUT]: {}", exception)
-            In.ExecutionFailed(exception.toString, replyTo)
+            ctx.log.info("[FAILURE]: {}", exception)
+            In.ExecutionFailed(exception.getMessage, replyTo)
 
         Behaviors.same
 
