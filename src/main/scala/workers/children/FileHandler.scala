@@ -2,39 +2,42 @@ package workers.children
 
 import org.apache.pekko.actor.typed.{ActorRef, Terminated}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.stream.scaladsl.{FileIO, Source}
+import org.apache.pekko.util.ByteString
 import workers.children.FileHandler.In.PrepareFile
 import workers.Worker
 
 import java.io.{File, PrintWriter}
+import java.nio.file.{Path, Paths}
 import scala.concurrent.Future
 import scala.util.*
 
 
-// Actor that prepares the file before asking CodeExecutor to run it
 object FileHandler:
 
-  // incoming messages
   enum In:
-    // received from Worker to prepare the file for executing it later
     case PrepareFile(name: String, code: String, compiler: String, replyTo: ActorRef[Worker.In])
     case FilePrepared(compiler: String, file: File, replyTo: ActorRef[Worker.In])
     case FilePreparationFailed(why: String, replyTo: ActorRef[Worker.In])
 
-
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
     import CodeExecutor.In.*
     import ctx.executionContext
+    import ctx.system
 
     val selfName = ctx.self
-    
+
     ctx.log.info(s"{}: processing {}", selfName, msg)
 
     msg match
       case In.PrepareFile(name, code, compiler, replyTo) =>
         val asyncFile = for
           file <- Future(File(name))
-          _    <- Future(Using.resource(PrintWriter(name))(_.write(code)))
+          _    <- Source.single(code) // write code to file
+            .map(ByteString.apply)
+            .runWith(FileIO.toPath(Path.of(name)))
         yield file
+
 
         ctx.pipeToSelf(asyncFile):
           case Success(file) => In.FilePrepared(compiler, file, replyTo)
