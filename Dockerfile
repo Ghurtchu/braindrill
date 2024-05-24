@@ -29,4 +29,4 @@ COPY . /app
 RUN sbt clean assembly
 
 # Run application when the container launches
-CMD ["java", "-jar", "target/scala-3.4.1/braindrill.jar"]
+ENTRYPOINT ["java", "-jar", "target/scala-3.4.1/braindrill.jar"]

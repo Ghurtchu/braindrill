@@ -19,7 +19,7 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration.*
 import scala.util.*
 
-object ClusterBootstrap:
+object ClusterSystem:
 
   def apply(): Behavior[Nothing] = Behaviors.setup[Nothing]: ctx =>
     val cluster = Cluster(ctx.system)
