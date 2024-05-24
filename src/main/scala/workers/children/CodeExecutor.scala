@@ -38,7 +38,7 @@ object CodeExecutor:
       case In.Execute(compiler, file, replyTo) =>
         ctx.log.info(s"{} executing submitted code", selfName)
         val asyncExecuted: Future[In.Executed] = for
-          ps <- execute(Array("timeout", "2", compiler, file.getName)) // start process with 2 seconds timeout
+          ps <- execute(Array("timeout", "3", compiler, file.getName)) // start process with 3 seconds timeout
           (asyncSuccess, asyncError) = read(ps.inputReader) -> read(ps.errorReader) // read success and error concurrently
           ((success, error), exitCode)  <- asyncSuccess.zip(asyncError).zip(Future(ps.waitFor)) // join success, error and exitCode
           _ = Future(file.delete) // remove file in the background to free up the memory
@@ -50,10 +50,14 @@ object CodeExecutor:
 
         ctx.pipeToSelf(asyncExecuted):
           case Success(executed)  =>
+            ctx.log.info("[SUCCESS OUTPUT]: {}", executed)
             executed.exitCode match
               case 124 => In.ExecutionFailed("The process was terminated because it exceeded the timeout", replyTo)
+              case 137 => In.ExecutionFailed("The code is using too much memory", replyTo)
               case _   => In.ExecutionSucceeded(executed.output, replyTo)
-          case Failure(exception) => In.ExecutionFailed(exception.toString, replyTo)
+          case Failure(exception) =>
+            ctx.log.info("[FAILURE OUTPUT]: {}", exception)
+            In.ExecutionFailed(exception.toString, replyTo)
 
         Behaviors.same
 
