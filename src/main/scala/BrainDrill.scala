@@ -4,8 +4,6 @@ import com.typesafe.config.ConfigFactory
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 
-import scala.util.Try
-
 object BrainDrill extends App:
 
   val cfg = ConfigFactory.load()
