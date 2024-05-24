@@ -20,6 +20,8 @@ import scala.concurrent.duration.*
 import scala.util.*
 
 object ClusterBootstrap:
+
+  // Behavior[Nothing] aka root behavior since it just starts nodes
   def apply(): Behavior[Nothing] = Behaviors.setup[Nothing]: ctx =>
     val cluster = Cluster(ctx.system)
     val node = cluster.selfMember
@@ -27,25 +29,26 @@ object ClusterBootstrap:
 
     if node hasRole "worker" then
       val numberOfWorkers = Try(cfg.getInt("transformation.workers-per-node")).getOrElse(50)
-      // actor that forwards StartExecution messages to local Worker actors in a round robin fashion
+
+      // actor that sends StartExecution message to local Worker actors in a round robin fashion
       val workerRouter = ctx.spawn(
         behavior = Routers.pool(numberOfWorkers) {
-          Behaviors.supervise(Worker().narrow[Worker.StartExecution])
+          Behaviors.supervise(Worker().narrow[StartExecution])
             .onFailure(SupervisorStrategy.restart)
         } .withRoundRobinRouting(),
         name = "worker-router"
       )
 
-      // ActorRefs are registered to the receptionist using a ServiceKey
-      // so all remote worker-router-s will be registered to ClusterBootstrap actor system receptionist
-      // when the node starts it registers the local worker-router to the system Receptionist
-      // so that "master" node can have access to remote worker-router later
+      // actors are registered to the ActorSystem receptionist using a special ServiceKey.
+      // All remote worker-routers will be registered to ClusterBootstrap actor system receptionist.
+      // When the "worker" node starts it registers the local worker-router to the Receptionist which is cluster-wide
+      // As a result "master" node can have access to remote worker-router and receive any updates about workers through worker-router
       ctx.system.receptionist ! Receptionist.Register(Worker.WorkerRouterKey, workerRouter)
 
     if node hasRole "master" then
       given system: ActorSystem[Nothing] = ctx.system
       given ec: ExecutionContextExecutor = ctx.executionContext
-      given timeout: Timeout = Timeout(5.seconds) // TODO: configure
+      given timeout: Timeout = Timeout(4.seconds)
 
       val numberOfLoadBalancers = Try(cfg.getInt("transformation.load-balancer")).getOrElse(2)
       // pool of load balancers that forward StartExecution message to the remote worker-router actors in a round robin fashion

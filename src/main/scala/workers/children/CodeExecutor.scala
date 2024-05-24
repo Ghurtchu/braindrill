@@ -5,10 +5,15 @@ import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.pattern
+import org.apache.pekko.stream.IOResult
+import org.apache.pekko.stream.scaladsl.{Sink, Source, StreamConverters}
+import org.apache.pekko.util.ByteString
 import workers.Worker
 import workers.children.CodeExecutor.In
 
 import java.io.{BufferedReader, File}
+import java.nio.channels.AsynchronousFileChannel
+import java.util.stream
 import scala.annotation.tailrec
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -38,8 +43,11 @@ object CodeExecutor:
       case In.Execute(compiler, file, replyTo) =>
         ctx.log.info(s"{} executing submitted code", selfName)
         val asyncExecuted: Future[In.Executed] = for
-          ps <- execute(Array("timeout", "3", compiler, file.getName)) // start process with 3 seconds timeout
-          (asyncSuccess, asyncError) = read(ps.inputReader) -> read(ps.errorReader) // read success and error concurrently
+          ps <- execute(Array("timeout", "2", compiler, file.getName)) // start process with 2 seconds timeout
+          successSource = StreamConverters.fromInputStream(() => ps.getInputStream)
+          errorSource = StreamConverters.fromInputStream(() => ps.getErrorStream)
+          readOutput = Sink.fold[String, ByteString]("")(_ + _.utf8String)
+          (asyncSuccess, asyncError) = successSource.runWith(readOutput) -> errorSource.runWith(readOutput)
           ((success, error), exitCode)  <- asyncSuccess.zip(asyncError).zip(Future(ps.waitFor)) // join success, error and exitCode
           _ = Future(file.delete) // remove file in the background to free up the memory
         yield In.Executed(
@@ -60,6 +68,7 @@ object CodeExecutor:
             In.ExecutionFailed(exception.getMessage, replyTo)
 
         Behaviors.same
+
 
       case In.ExecutionSucceeded(output, replyTo) =>
         ctx.log.info(s"{} executed submitted code successfully", selfName)
