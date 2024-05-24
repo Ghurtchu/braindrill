@@ -7,19 +7,18 @@ import pekko.actor.typed.ActorSystem
 object BrainDrill:
 
   def main(args: Array[String]): Unit =
-    // deploy 3 workers nodes
+    // 3 workers nodes
     Iterator
       .iterate(17356)(_ + 1)
       .take(3)
       .foreach:
         deploy("worker", _)
 
-    // deploy single master node
+    // single master node
     deploy("master", 0)
 
   private def deploy(role: String, port: Int): Unit =
-    // load config with default fallback
-    val config = ConfigFactory
+    val cfg = ConfigFactory
       .parseString(
         s"""
           pekko.remote.artery.canonical.port=$port
@@ -28,5 +27,4 @@ object BrainDrill:
           """)
       .withFallback(ConfigFactory.load("transformation"))
 
-    // create actor system with cluster bootstrap
-    ActorSystem[Nothing](ClusterBootstrap(), "ClusterSystem", config)
+    ActorSystem[Nothing](ClusterBootstrap(), "ClusterSystem", cfg)

@@ -7,8 +7,8 @@ import org.apache.pekko.util.ByteString
 import workers.children.FileHandler.In.PrepareFile
 import workers.Worker
 
-import java.io.{File, PrintWriter}
-import java.nio.file.{Path, Paths}
+import java.io.File
+import java.nio.file.Path
 import scala.concurrent.Future
 import scala.util.*
 
@@ -25,32 +25,30 @@ object FileHandler:
     import ctx.executionContext
     import ctx.system
 
-    val selfName = ctx.self
+    val self = ctx.self
 
-    ctx.log.info(s"{}: processing {}", selfName, msg)
+    ctx.log.info(s"{}: processing {}", self, msg)
 
     msg match
       case In.PrepareFile(name, code, compiler, replyTo) =>
         val asyncFile = for
           file <- Future(File(name))
-          _    <- Source.single(code) // write code to file
+          _    <- Source.single(code)
             .map(ByteString.apply)
             .runWith(FileIO.toPath(Path.of(name)))
         yield file
 
-
         ctx.pipeToSelf(asyncFile):
           case Success(file) => In.FilePrepared(compiler, file, replyTo)
-          case Failure(why)  => In.FilePreparationFailed(why.toString, replyTo)
+          case Failure(why)  => In.FilePreparationFailed(why.getMessage, replyTo)
 
         Behaviors.same
 
       case In.FilePrepared(compiler, file, replyTo) =>
-        // create code executor actor
         val codeExecutor = ctx.spawn(CodeExecutor(), "code-executor")
-        // observe it for self-destruction later when the child stops
+        // observe child for self-destruction
         ctx.watch(codeExecutor)
-        ctx.log.info("{} prepared file, sending Execute to {}", selfName, codeExecutor)
+        ctx.log.info("{} prepared file, sending Execute to {}", self, codeExecutor)
         codeExecutor ! Execute(compiler, file, replyTo)
 
         Behaviors.same
@@ -58,17 +56,16 @@ object FileHandler:
       case In.FilePreparationFailed(why, replyTo) =>
         ctx.log.warn(
           "{} failed during file preparation due to {}, sending ExecutionFailed to {}",
-          selfName,
+          self,
           why,
           replyTo
         )
         replyTo ! Worker.ExecutionFailed(why)
 
-        // stopping actor, Worker should decide what to do
         Behaviors.stopped
 
   .receiveSignal:
     case (ctx, Terminated(ref)) =>
       ctx.log.info(s"{} is stopping because child actor: {} was stopped", ctx.self, ref)
-      // stopping self, since child also stopped
+
       Behaviors.stopped

@@ -15,13 +15,12 @@ import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import workers.Worker.*
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration.*
 import scala.util.*
 
 object ClusterBootstrap:
 
-  // Behavior[Nothing] aka root behavior since it just starts nodes
   def apply(): Behavior[Nothing] = Behaviors.setup[Nothing]: ctx =>
     val cluster = Cluster(ctx.system)
     val node = cluster.selfMember
@@ -29,7 +28,6 @@ object ClusterBootstrap:
 
     if node hasRole "worker" then
       val numberOfWorkers = Try(cfg.getInt("transformation.workers-per-node")).getOrElse(50)
-
       // actor that sends StartExecution message to local Worker actors in a round robin fashion
       val workerRouter = ctx.spawn(
         behavior = Routers.pool(numberOfWorkers) {
@@ -38,7 +36,6 @@ object ClusterBootstrap:
         } .withRoundRobinRouting(),
         name = "worker-router"
       )
-
       // actors are registered to the ActorSystem receptionist using a special ServiceKey.
       // All remote worker-routers will be registered to ClusterBootstrap actor system receptionist.
       // When the "worker" node starts it registers the local worker-router to the Receptionist which is cluster-wide
@@ -54,7 +51,7 @@ object ClusterBootstrap:
       // pool of load balancers that forward StartExecution message to the remote worker-router actors in a round robin fashion
       val loadBalancers = (1 to numberOfLoadBalancers).map: n =>
         ctx.spawn(
-          behavior = Routers.group(Worker.WorkerRouterKey).withRoundRobinRouting(),
+          behavior = Routers.group(Worker.WorkerRouterKey).withRoundRobinRouting(), // routes StartExecution message to the remote worker-router
           name = s"load-balancer-$n"
         )
 
@@ -66,14 +63,18 @@ object ClusterBootstrap:
               val asyncResponse = loadBalancer
                 .ask[ExecutionResult](StartExecution(code, lang, _))
                 .map(_.value)
-                .recover(_ => "something went wrong") // TODO: make better recovery
+                .recover(_ => "something went wrong")
 
               complete(asyncResponse)
 
-      val (host, port) = ("0.0.0.0", 8080) // TODO: make them configurable
+      val host = Try(cfg.getString("http.host")).getOrElse("0.0.0.0")
+      val port = Try(cfg.getInt("http.port")).getOrElse(8080)
 
-      Http()
+      val deployHttpServer = Http()
         .newServerAt(host, port)
         .bind(route)
 
+      ctx.log.info("Server listening on {}", s"$host:$port")
+
     Behaviors.empty[Nothing]
+

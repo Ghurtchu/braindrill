@@ -9,83 +9,65 @@ import workers.children.FileHandler
 
 import scala.util.*
 
-// Worker actor that initiates the code execution task
 object Worker:
 
   val WorkerRouterKey = ServiceKey[Worker.StartExecution]("worker-router.StartExecution")
 
-  // incoming messages
   sealed trait In
-  // received from LoadBalancer to initiate task
   final case class StartExecution(code: String, language: String, replyTo: ActorRef[Worker.ExecutionResult]) extends In with CborSerializable
 
-  // incoming messages received from CodeExecutor
-  sealed trait ExecutionResult extends In {
+  sealed trait ExecutionResult extends In:
     def value: String
-  }
 
   final case class ExecutionSucceeded(value: String) extends ExecutionResult with CborSerializable
   final case class ExecutionFailed(value: String)    extends ExecutionResult with CborSerializable
 
-  // private data model for grouping execution inputs for docker process
-  private final case class ExecutionInputs(compiler: String, extension: String)
+  private final case class LanguageSpecifics(compiler: String, extension: String)
 
-  // mapping programming language to its inputs
-  private val mappings: Map[String, ExecutionInputs] =
+  private val languageSpecifics: Map[String, LanguageSpecifics] =
     Map(
-      "scala" -> ExecutionInputs("scala", ".scala"),
-      "java" -> ExecutionInputs("java", ".java"),
-      "python" -> ExecutionInputs("python3", ".py"),
-      "javascript" -> ExecutionInputs("node", ".js"),
+      "scala" -> LanguageSpecifics("scala", ".scala"),
+      "java" -> LanguageSpecifics("java", ".java"),
+      "python" -> LanguageSpecifics("python3", ".py"),
+      "javascript" -> LanguageSpecifics("node", ".js"),
     )
 
-  def apply(requester: Option[ActorRef[Worker.ExecutionResult]] = None): Behavior[In] =
+  def apply(workerRouter: Option[ActorRef[Worker.ExecutionResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
-      val selfName = ctx.self
+      val self = ctx.self
 
       Behaviors.receiveMessage[In]:
         case msg @ StartExecution(code, lang, replyTo) =>
-          ctx.log.info(s"{} processing StartExecution", selfName)
-          mappings.get(lang) match
-            case Some(inputs) =>
-              // create file handler actor which prepares the file to be executed later
+          ctx.log.info(s"{} processing StartExecution", self)
+          languageSpecifics get lang match
+            case Some(specifics) =>
               val fileHandler = ctx.spawn(FileHandler(), s"file-handler")
-              ctx.log.info(s"{} sending PrepareFile to {}", selfName, fileHandler)
+              ctx.log.info(s"{} sending PrepareFile to {}", self, fileHandler)
 
               fileHandler ! FileHandler.In.PrepareFile(
-                name = s"$lang${Random.nextLong}${inputs.extension}", // random number for avoiding file overwrite/shadowing
-                compiler = inputs.compiler,
+                name = s"$lang${Random.nextInt}${specifics.extension}", // random number for avoiding file overwrite/shadowing
+                compiler = specifics.compiler,
                 code = code,
                 replyTo = ctx.self
               )
             case None =>
               val reason = s"unsupported language: $lang"
-              ctx.log.warn(s"{} failed execution due to: {}", selfName, reason)
+              ctx.log.warn(s"{} failed execution due to: {}", self, reason)
 
               replyTo ! Worker.ExecutionFailed(reason)
 
           // register original requester
-          apply(requester = Some(replyTo))
+          apply(workerRouter = Some(replyTo))
 
-        // forward successful outcome to LoadBalancer
         case msg @ ExecutionSucceeded(result) =>
-          requester match
-            case Some(requester) =>
-              ctx.log.info(s"{} sending ExecutionSucceeded to {}", selfName, requester)
-              requester ! msg
-            case None =>
-              ctx.log.warn(s"there is nobody to reply ExecutionSucceeded to, original requester is empty")
+          ctx.log.info(s"{} sending ExecutionSucceeded to {}", self, workerRouter)
+          workerRouter.foreach(_ ! msg)
 
-          apply(requester = None)
+          apply(workerRouter = None)
 
-        // forward failed outcome to LoadBalancer
         case msg @ ExecutionFailed(reason) =>
-          requester match
-            case Some(requester) =>
-              ctx.log.info(s"{} sending ExecutionFailed to {}", selfName, requester)
-              requester ! msg
-            case None =>
-              ctx.log.warn(s"there is nobody to reply ExecutionFailed to, original requester is empty")
+          ctx.log.info(s"{} sending ExecutionFailed to {}", self, workerRouter)
+          workerRouter.foreach(_ ! msg)
 
-          apply(requester = None)
+          apply(workerRouter = None)
 
