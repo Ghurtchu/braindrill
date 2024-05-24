@@ -8,7 +8,7 @@ Requirements for deploying locally:
 Running locally:
 - clone the project and navigate to the root directory
 - `docker build -t braindrill .`
-- `docker run -p 8080:8080 braindrill`
+- `docker run -p 8080:8080 --cpus="8" --memory="1024m" --security-opt seccomp:unconfined braindrill`
 
 Example:
 - sending `POST` request at `localhost:8080/lang/python`
@@ -59,13 +59,14 @@ TODO:
 - run cluster within docker containers - ✅
 - run code inside running worker node container - ✅ 
 - implement timeouts & cleanup for long-running code - ✅
+- limit container memory and cpu, add secure layer - ❌
+- run code inside separate sibling containers - ❌
 - use other `pekko` libraries to make cluster bootstrapping and management flexible and configurable - ❌
-- implement extra security measures for docker container to prevent malfunction - ❌
-- write load tests to check how system behaves during high load - ❌
-- add support for C, C++, Go and others - ❌
-- deploy a few pekko-http servers and enable `RoundRobin` load balancing - ❌
 - wrap the cluster in k8s - ❌
+- deploy a few pekko-http servers and enable `RoundRobin` load balancing - ❌
+- write load tests to check how system behaves during high load - ❌
 - enable autoscaling  - ❌
+- add support for C, C++, Go and others - ❌
 
 Architecture Diagram:
 
