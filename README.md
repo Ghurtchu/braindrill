@@ -54,18 +54,16 @@ DONE:
 - introduce Pekko Cluster - ✅
 - turn local master actor into load balancer node - ✅
 - create 3 worker nodes - ✅
-- make worker actors sharded on each node (e.g 25 actors on each node, awaiting tasks) - ✅
-- run cluster within docker containers - ✅
-- run code inside running worker node container - ✅ 
+- distribute worker actors equally on each node (e.g 25 actors on each node, awaiting tasks) - ✅
+- run cluster via docker-compose - ✅ 
 - implement timeouts & cleanup for long-running code, limit CPU and RAM, add secure layer - ✅
 
 TODO:
 - write load tests to check how system behaves during high load - ❌
 - add support for C, C++, Go and others - ❌
 - use other `pekko` libraries to make cluster bootstrapping and management flexible and configurable - ❌
-- wrap the cluster in k8s - ❌
-- deploy a few pekko-http servers and enable `RoundRobin` load balancing - ❌
-- enable autoscaling  - ❌
+- wrap the cluster in k8s and enable autoscaling - ❌
+- deploy two separate clusters and enable `RoundRobin` load balancing via k8s - ❌
 
 Architecture Diagram:
 

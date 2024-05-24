@@ -52,7 +52,7 @@ object CodeExecutor:
               case 137 => In.ExecutionFailed("The process was aborted because it exceeded the memory usage", replyTo)
               case _   => In.ExecutionSucceeded(executed.output, replyTo)
           case Failure(exception) =>
-            ctx.log.info("{}: execution failed due to {}", self, exception.getMessage)
+            ctx.log.warn("{}: execution failed due to {}", self, exception.getMessage)
             In.ExecutionFailed(exception.getMessage, replyTo)
 
         Behaviors.same

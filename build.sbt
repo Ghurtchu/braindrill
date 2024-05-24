@@ -29,8 +29,8 @@ libraryDependencies ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "org.apache.pekko" %% "pekko-management-cluster-bootstrap" % PekkoManagementVersion,
-  "org.apache.pekko" %% "pekko-discovery" % PekkoVersion
+  // "org.apache.pekko" %% "pekko-management-cluster-bootstrap" % PekkoManagementVersion,
+  // "org.apache.pekko" %% "pekko-discovery" % PekkoVersion
 )
 
 lazy val root = (project in file("."))
