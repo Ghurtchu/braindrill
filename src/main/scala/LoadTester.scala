@@ -10,14 +10,18 @@ import java.time.temporal.ChronoUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.*
 import scala.util.Random
+import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 object LoadTester extends App {
 
   enum Code(val value: String):
     case MemoryIntensive extends Code(Python.MemoryIntensive)
-    case CPUIntensive extends Code(Python.CPUIntensive)
-    case Abusive extends Code(Python.Abusive)
-    case Simple extends Code(Python.Simple)
+    case CPUIntensive    extends Code(Python.CPUIntensive)
+    case Medium          extends Code(Python.Medium)
+    case Simple          extends Code(Python.Simple)
+    case Instant         extends Code(Python.Instant)
 
   object Code:
     def random: Code = Code.values.apply(Random.nextInt(Code.values.length))
@@ -27,13 +31,9 @@ object LoadTester extends App {
       """
         |def memory_intensive_task(size_mb):
         |    # Create a list of integers to consume memory
-        |    data = [0] * (size_mb * 1024 * 1024 // 8)  # Each element takes 8 bytes on a 64-bit system
+        |    data = [0] * (size_mb * 1024 * 1024)  # Each element takes 8 bytes on a 64-bit system
         |    return data
-        |
-        |# Example usage
-        |result = memory_intensive_task(100)  # Allocate 100 MB of memory
-        |print("Memory-intensive task completed.")
-        |
+        |print(memory_intensive_task(10))  # Allocate 10 MB of memory
         |""".stripMargin
 
     val CPUIntensive =
@@ -43,60 +43,132 @@ object LoadTester extends App {
         |    for i in range(n):
         |        result += i * i
         |    return result
-        |
-        |# Example usage
-        |result = cpu_intensive_task(1000000)
-        |print(result)
-        |
+        |print(cpu_intensive_task(50))
         |""".stripMargin
 
-    val Abusive =
-      """
-        |while True:
-        |    print("infinite loop")
+    val Medium =
+      """import random
+        |
+        |# Initialize the stop variable to False
+        |stop = False
+        |
+        |while not stop:
+        |    # Generate a random number between 1 and 100
+        |    random_number = random.randint(1, 1000)
+        |    print(f"Generated number: {random_number}")
+        |
+        |    # Check if the generated number is greater than 80
+        |    if random_number == 1000:
+        |        stop = True
+        |
+        |print("Found a number greater than 80. Exiting loop.")
         |""".stripMargin
 
     val Simple =
       """
-        |def hello_world():
-        |    print("hello, world!")
-        |
-        |hello_world()
+        |for i in range(1, 10):
+        |    print("number: " + str(i))
         |""".stripMargin
+
+    val Instant = "print('hello world')"
 
   given system: ActorSystem = ActorSystem("LoadTester")
   given ec: ExecutionContextExecutor = system.classicSystem.dispatcher
 
   val http = Http(system)
 
-  val source: Source[(Instant, Code), Cancellable] = Source.tick(0.seconds, 0.1.seconds, NotUsed)
-    .map(_ => (Instant.now(), Code.random))
+  val requestCount = new AtomicInteger(0)
+  val responseTimes = new AtomicLong(0)
+  val responseTimeDetails = mutable.ArrayBuffer[Long]()
+  val errors = new AtomicInteger(0)
 
-  val flow: Flow[(Instant, Code), (Instant, Instant, Code), NotUsed] = Flow[(Instant, Code)]
-    .mapAsyncUnordered(10) { case (startTime, code) =>
-      val request = HttpRequest(
-        method = HttpMethods.POST,
-        uri = "http://localhost:8080/lang/python",
-        entity = HttpEntity(ContentTypes.`application/json`, ByteString(code.value))
-      )
+  def randInterval() =
+    Random.shuffle {
+      List
+        .iterate(100, 18)(_ + 50)
+        .map(_.millis)
+    }.head
 
-      val responseFuture: Future[HttpResponse] = http.singleRequest(request)
-      responseFuture.flatMap { response =>
-        response.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { body =>
-          val responseBody = body.utf8String
-          println(s"output $responseBody")
+  def randId(): String =
+    java.util.UUID.randomUUID()
+      .toString
+      .replace("-", "")
+      .substring(1, 10)
+
+  def stream(name: String, interval: FiniteDuration) = {
+
+    println(s"[$name] generating random code per $interval")
+
+    val generateRandomCode: Source[Code, Cancellable] = Source.tick(0.seconds, interval, NotUsed)
+      .map(_ => Code.random)
+
+    val sendHttpRequest: Flow[Code, (Instant, Instant, String, Code), NotUsed] = Flow[Code]
+      .mapAsync(100) { code =>
+        val request = HttpRequest(
+          method = HttpMethods.POST,
+          uri = "http://localhost:8080/lang/python",
+          entity = HttpEntity(ContentTypes.`application/json`, ByteString(code.value))
+        )
+
+        val now = Instant.now()
+        val requestId = randId()
+        println(s"[$name]: sending Request($requestId, $code) at $now")
+
+        http.singleRequest(request).map { response =>
+          val end = Instant.now()
           response.discardEntityBytes()
-          (startTime, Instant.now(), code)
+
+          requestCount.incrementAndGet()
+          val duration = ChronoUnit.MILLIS.between(now, end)
+          responseTimes.addAndGet(duration)
+          responseTimeDetails += duration
+
+          (now, end, requestId, code)
+        }.recover {
+          case ex =>
+            println(ex)
+            errors.incrementAndGet()
+            (now, Instant.now(), requestId, code)
         }
       }
+
+    val showResponseTime: Sink[(Instant, Instant, String, Code), Future[Done]] = Sink.foreach { case (start, end, requestId, code) =>
+      val duration = ChronoUnit.MILLIS.between(start, end)
+      println(s"[$name]: received response for Request($requestId, $code) in $duration millis at: $end, now: ${Instant.now()}")
     }
 
-  val sink: Sink[(Instant, Instant, Code), Future[Done]] = Sink.foreach { case (start, end, code) =>
-    val duration = ChronoUnit.MILLIS.between(start, end)
-    println(s"$code execution took $duration milliseconds")
+    generateRandomCode
+      .via(sendHttpRequest)
+      .toMat(showResponseTime)(Keep.right)
   }
 
-  val runnableGraph = source.via(flow).toMat(sink)(Keep.right)
 
-  runnableGraph.run()
+  stream(s"stream", 100.millis)
+      .run()
+
+  system.scheduler.scheduleWithFixedDelay(60.seconds, 60.seconds) { () =>
+    val count = requestCount.getAndSet(0)
+    val totalResponseTime = responseTimes.getAndSet(0)
+    val averageResponseTime = if (count > 0) totalResponseTime / count else 0
+    val errorCount = errors.getAndSet(0)
+    val p50 = percentile(responseTimeDetails, 50)
+    val p90 = percentile(responseTimeDetails, 90)
+    val p99 = percentile(responseTimeDetails, 99)
+
+    println("-" * 50)
+    println(s"Requests in last minute: $count")
+    println(s"Average response time: $averageResponseTime ms")
+    println(s"Error count: $errorCount")
+    println(s"Response time percentiles: p50=$p50 ms, p90=$p90 ms, p99=$p99 ms")
+    println("-" * 50)
+
+    responseTimeDetails.clear()
+  }
+
+  def percentile(data: ArrayBuffer[Long], p: Double): Long = {
+    if (data.isEmpty) return 0
+    val sortedData = data.sorted
+    val k = (sortedData.length * (p / 100.0)).ceil.toInt - 1
+    sortedData(k)
+  }
 }

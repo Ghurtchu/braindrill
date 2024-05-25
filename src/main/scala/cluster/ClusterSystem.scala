@@ -45,9 +45,9 @@ object ClusterSystem:
     if node hasRole "master" then
       given system: ActorSystem[Nothing] = ctx.system
       given ec: ExecutionContextExecutor = ctx.executionContext
-      given timeout: Timeout = Timeout(4.seconds)
+      given timeout: Timeout = Timeout(3.seconds)
 
-      val numberOfLoadBalancers = Try(cfg.getInt("transformation.load-balancer")).getOrElse(2)
+      val numberOfLoadBalancers = Try(cfg.getInt("transformation.load-balancer")).getOrElse(3)
       // pool of load balancers that forward StartExecution message to the remote worker-router actors in a round robin fashion
       val loadBalancers = (1 to numberOfLoadBalancers).map: n =>
         ctx.spawn(
