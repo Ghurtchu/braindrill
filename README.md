@@ -57,10 +57,10 @@ DONE:
 - distribute worker actors equally on each node (e.g 25 actors on each node, awaiting tasks) - ✅
 - run cluster via docker-compose - ✅ 
 - implement timeouts & cleanup for long-running code, limit CPU and RAM, add secure layer - ✅
+- write basic load test to check how system behaves during high load - ✅ 
 
 TODO:
-- write load tests to check how system behaves during high load - ❌
-- add support for C, C++, Go and others - ❌
+- perform aggregation statistics in load test - ❌
 - use other `pekko` libraries to make cluster bootstrapping and management flexible and configurable - ❌
 - wrap the cluster in k8s and enable autoscaling - ❌
 - deploy two separate clusters and enable `RoundRobin` load balancing via k8s - ❌
