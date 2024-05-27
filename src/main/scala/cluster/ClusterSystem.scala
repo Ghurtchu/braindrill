@@ -63,7 +63,7 @@ object ClusterSystem:
               val asyncResponse = loadBalancer
                 .ask[ExecutionResult](StartExecution(code, lang, _))
                 .map(_.value)
-                .recover(_ => "something went wrong")
+                .recover(_ => "request timed out")
 
               complete(asyncResponse)
 

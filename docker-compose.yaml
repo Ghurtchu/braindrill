@@ -13,6 +13,7 @@ services:
       - '8080:8080'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - engine:/data
     working_dir: /app
     environment:
       CLUSTER_IP: 'master'
@@ -32,6 +33,7 @@ services:
       - 'seccomp=unconfined'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - engine:/data
     working_dir: /app
     environment:
       CLUSTER_IP: 'worker-1'
@@ -52,6 +54,7 @@ services:
       - 'seccomp=unconfined'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - engine:/data
     working_dir: /app
     environment:
       CLUSTER_IP: 'worker-2'
@@ -72,6 +75,7 @@ services:
       - 'seccomp=unconfined'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - engine:/data
     working_dir: /app
     environment:
       CLUSTER_IP: 'worker-3'
@@ -79,3 +83,7 @@ services:
       CLUSTER_ROLE: 'worker'
       SEED_IP: 'master'
       SEED_PORT: '1600'
+
+volumes:
+  engine:
+    external: true

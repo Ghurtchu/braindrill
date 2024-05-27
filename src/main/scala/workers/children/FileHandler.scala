@@ -32,10 +32,10 @@ object FileHandler:
     msg match
       case In.PrepareFile(name, code, compiler, replyTo) =>
         val asyncFile = for
-          file <- Future(File(name))
+          file <- Future(File(s"/data/$name"))
           _    <- Source.single(code)
             .map(ByteString.apply)
-            .runWith(FileIO.toPath(Path.of(name)))
+            .runWith(FileIO.toPath(Path.of(s"/data/$name")))
         yield file
 
         ctx.pipeToSelf(asyncFile):
