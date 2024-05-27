@@ -70,7 +70,7 @@ object ClusterSystem:
       val host = Try(cfg.getString("http.host")).getOrElse("0.0.0.0")
       val port = Try(cfg.getInt("http.port")).getOrElse(8080)
 
-      val deployHttpServer = Http()
+      Http()
         .newServerAt(host, port)
         .bind(route)
 

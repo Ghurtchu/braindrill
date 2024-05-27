@@ -55,12 +55,11 @@ object LoadTester extends App:
         responseTimeDetails += duration
 
         (now, end, requestId, code)
-      }.recover {
+      }.recover:
         case ex =>
           println(s"[FAILURE]: ${ex.getMessage}")
           errors.incrementAndGet()
           (now, Instant.now(), requestId, code)
-      }
     }
 
   val displayResponseTime: Sink[(Instant, Instant, String, Code), Future[Done]] =

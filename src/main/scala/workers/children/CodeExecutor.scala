@@ -33,6 +33,7 @@ object CodeExecutor:
         ctx.log.info(s"{}: executing submitted code", self)
         val asyncExecuted: Future[In.Executed] = for
           ps <- run("timeout", "2", compiler, file.getName) // start process with 2 seconds timeout
+          _ <- run("prlimit", "--pid", s"${ps.pid()}", "--as=2048")
           (successSource, errorSource) = src(ps.getInputStream) -> src(ps.getErrorStream) // error and success channels as streams
           ((success, error), exitCode) <- successSource.runWith(ReadOutput) // join success, error and exitCode
             .zip(errorSource.runWith(ReadOutput))
@@ -48,9 +49,9 @@ object CodeExecutor:
           case Success(executed)  =>
             ctx.log.info("{}: executed submitted code", self)
             executed.exitCode match
-              case 124 => In.ExecutionFailed("The process was aborted because it exceeded the timeout", replyTo)
-              case 137 => In.ExecutionFailed("The process was aborted because it exceeded the memory usage", replyTo)
-              case _   => In.ExecutionSucceeded(executed.output, replyTo)
+              case 124       => In.ExecutionFailed("The process was aborted because it exceeded the timeout", replyTo)
+              case 137 | 139 => In.ExecutionFailed("The process was aborted because it exceeded the memory usage", replyTo)
+              case _         => In.ExecutionSucceeded(executed.output, replyTo)
           case Failure(exception) =>
             ctx.log.warn("{}: execution failed due to {}", self, exception.getMessage)
             In.ExecutionFailed(exception.getMessage, replyTo)
