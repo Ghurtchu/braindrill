@@ -79,7 +79,7 @@ object Simulator extends App:
   }
 
   // run the stream
-  stream("simulator", 125.millis)
+  stream("simulator", 160.millis)
     .run()
 
   system.scheduler.scheduleWithFixedDelay(60.seconds, 60.seconds): () =>
@@ -136,7 +136,7 @@ object Simulator extends App:
         |    # Create a list of integers to consume memory
         |    data = [0] * (size_mb * 1024 * 1024)  # Each element takes 8 bytes on a 64-bit system
         |    return data
-        |print(memory_intensive_task(10))  # Allocate 10 MB of memory
+        |print(memory_intensive_task(2))  # Allocate 10 MB of memory
         |""".stripMargin
 
     val CPUIntensive =
