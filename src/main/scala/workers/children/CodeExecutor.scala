@@ -33,14 +33,13 @@ object CodeExecutor:
         ctx.log.info(s"{}: executing submitted code", self)
         val asyncExecuted: Future[In.Executed] = for
           // just copies file there
-          // cat py.py | docker run -i python python3
           ps <- run(
             "docker",
             "run",
             "--rm",
             "--ulimit",
             "cpu=1",
-            "--memory=6m",
+            "--memory=10m",
             "-v",
             "engine:/data",
             "-w",

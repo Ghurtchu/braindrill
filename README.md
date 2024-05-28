@@ -2,6 +2,8 @@
 
 Drill your brain, because why the heck not.
 
+Video demo: https://www.youtube.com/watch?v=sMlJC7Kr330
+
 Requirements for deploying locally:
 - docker engine
 
