@@ -19,9 +19,9 @@ Example:
 ![My Image](assets/python_example.png)
 
 Supported programming languages:
+- `Java 17`: `localhost:8080/lang/java`
 - `Python 3`: `localhost:8080/lang/python`
 - `JavaScript / Node 16`: `localhost:8080/lang/javascript`
-- `Java 17`: `localhost:8080/lang/java`
 
 Simple code snippets for testing:
 
