@@ -16,7 +16,7 @@ object CodeExecutor:
   private val ReadOutput: Sink[ByteString, Future[String]] = Sink.fold[String, ByteString]("")(_ + _.utf8String)
 
   enum In:
-    case Execute(compiler: String, file: File, replyTo: ActorRef[Worker.In])
+    case Execute(compiler: String, file: File, dockerImage: String, replyTo: ActorRef[Worker.In])
     case Executed(output: String, exitCode: Int, replyTo: ActorRef[Worker.In])
     case ExecutionFailed(why: String, replyTo: ActorRef[Worker.In])
     case ExecutionSucceeded(output: String, replyTo: ActorRef[Worker.In])
@@ -29,24 +29,24 @@ object CodeExecutor:
     val self = ctx.self
 
     msg match
-      case In.Execute(compiler, file, replyTo) =>
+      case In.Execute(compiler, file, dockerImage, replyTo) =>
         ctx.log.info(s"{}: executing submitted code", self)
         val asyncExecuted: Future[In.Executed] = for
           // just copies file there
           ps <- run(
             "docker",
             "run",
-            "--rm",
-            "--ulimit",
-            "cpu=1",
-            "--memory=10m",
-            "-v",
+            "--rm", // remove the container when it's done
+            "--ulimit", // set limits
+            "cpu=1", // 1 processor
+            "--memory=20m", // 20 M of memory
+            "-v", // bind volume
             "engine:/data",
-            "-w",
+            "-w", // set working directory to /data
             "/data",
-            "python",
-            "python3",
-            s"/data/${file.getName}",
+            dockerImage,
+            compiler,
+            s"${file.getPath}",
           )
           (successSource, errorSource) = src(ps.getInputStream) -> src(ps.getErrorStream) // error and success channels as streams
           ((success, error), exitCode) <- successSource.runWith(ReadOutput) // join success, error and exitCode
@@ -65,12 +65,7 @@ object CodeExecutor:
             executed.exitCode match
               case 124       => In.ExecutionFailed("The process was aborted because it exceeded the timeout", replyTo)
               case 137 | 139 => In.ExecutionFailed("The process was aborted because it exceeded the memory usage", replyTo)
-              case _         =>
-                val maxSize = 5 * 1024 * 1024
-                if (executed.output.getBytes("UTF-8").length > maxSize)
-                  In.ExecutionFailed("Too much memory", replyTo)
-                else
-                  In.ExecutionSucceeded(executed.output, replyTo)
+              case _ => In.ExecutionSucceeded(executed.output, replyTo)
 
           case Failure(exception) =>
             ctx.log.warn("{}: execution failed due to {}", self, exception.getMessage)

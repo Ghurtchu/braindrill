@@ -16,8 +16,8 @@ import scala.util.*
 object FileHandler:
 
   enum In:
-    case PrepareFile(name: String, code: String, compiler: String, replyTo: ActorRef[Worker.In])
-    case FilePrepared(compiler: String, file: File, replyTo: ActorRef[Worker.In])
+    case PrepareFile(name: String, code: String, compiler: String, dockerImage: String, replyTo: ActorRef[Worker.In])
+    case FilePrepared(compiler: String, file: File, dockerImage: String, replyTo: ActorRef[Worker.In])
     case FilePreparationFailed(why: String, replyTo: ActorRef[Worker.In])
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
@@ -30,26 +30,27 @@ object FileHandler:
     ctx.log.info(s"{}: processing {}", self, msg)
 
     msg match
-      case In.PrepareFile(name, code, compiler, replyTo) =>
+      case In.PrepareFile(name, code, compiler, dockerImage, replyTo) =>
+        val filepath = s"/data/$name"
         val asyncFile = for
-          file <- Future(File(s"/data/$name"))
+          file <- Future(File(filepath))
           _    <- Source.single(code)
             .map(ByteString.apply)
-            .runWith(FileIO.toPath(Path.of(s"/data/$name")))
+            .runWith(FileIO.toPath(Path.of(filepath)))
         yield file
 
         ctx.pipeToSelf(asyncFile):
-          case Success(file) => In.FilePrepared(compiler, file, replyTo)
+          case Success(file) => In.FilePrepared(compiler, file, dockerImage, replyTo)
           case Failure(why)  => In.FilePreparationFailed(why.getMessage, replyTo)
 
         Behaviors.same
 
-      case In.FilePrepared(compiler, file, replyTo) =>
+      case In.FilePrepared(compiler, file, dockerImage, replyTo) =>
         val codeExecutor = ctx.spawn(CodeExecutor(), "code-executor")
         // observe child for self-destruction
         ctx.watch(codeExecutor)
         ctx.log.info("{} prepared file, sending Execute to {}", self, codeExecutor)
-        codeExecutor ! Execute(compiler, file, replyTo)
+        codeExecutor ! Execute(compiler, file, dockerImage, replyTo)
 
         Behaviors.same
 

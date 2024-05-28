@@ -22,14 +22,13 @@ object Worker:
   final case class ExecutionSucceeded(value: String) extends ExecutionResult with CborSerializable
   final case class ExecutionFailed(value: String)    extends ExecutionResult with CborSerializable
 
-  private final case class LanguageSpecifics(compiler: String, extension: String)
+  private final case class LanguageSpecifics(compiler: String, extension: String, dockerImage: String)
 
   private val languageSpecifics: Map[String, LanguageSpecifics] =
     Map(
-      "scala" -> LanguageSpecifics("scala", ".scala"),
-      "java" -> LanguageSpecifics("java", ".java"),
-      "python" -> LanguageSpecifics("python3", ".py"),
-      "javascript" -> LanguageSpecifics("node", ".js"),
+      "java" -> LanguageSpecifics("java", ".java", "openjdk:17"),
+      "python" -> LanguageSpecifics("python3", ".py", "python"),
+      "javascript" -> LanguageSpecifics("node", ".js", "node"),
     )
 
   def apply(workerRouter: Option[ActorRef[Worker.ExecutionResult]] = None): Behavior[In] =
@@ -47,6 +46,7 @@ object Worker:
               fileHandler ! FileHandler.In.PrepareFile(
                 name = s"$lang${Random.nextInt}${specifics.extension}", // random number for avoiding file overwrite/shadowing
                 compiler = specifics.compiler,
+                dockerImage = specifics.dockerImage,
                 code = code,
                 replyTo = ctx.self
               )
