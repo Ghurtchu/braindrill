@@ -1,4 +1,4 @@
-package loadtest
+package simulator
 
 import com.typesafe.config.ConfigFactory
 import org.apache.pekko.actor.{ActorSystem, Cancellable}
@@ -17,10 +17,10 @@ import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Random
 
-object LoadTester extends App:
+object Simulator extends App:
 
-  val actorSystem = "[load-tester]"
-  given system: ActorSystem = ActorSystem(actorSystem, ConfigFactory.load("load-tester.conf"))
+  val actorSystem = "SimulatorSystem"
+  given system: ActorSystem = ActorSystem(actorSystem, ConfigFactory.load("simulator.conf"))
   given ec: ExecutionContextExecutor = system.classicSystem.dispatcher
 
   val http = Http(system)
@@ -30,47 +30,56 @@ object LoadTester extends App:
   val responseTimeDetails = mutable.ArrayBuffer.empty[Long]
   val errors = AtomicInteger(0)
 
-  val generateRandomCode: Source[Code, Cancellable] = Source.tick(0.seconds, 100.millis, NotUsed)
-    .map(_ => Code.random)
+  def stream(name: String, interval: FiniteDuration) = {
 
-  val sendHttpRequest: Flow[Code, (Instant, Instant, String, Code), NotUsed] = Flow[Code]
-    .mapAsync(100) { code =>
-      val request = HttpRequest(
-        method = HttpMethods.POST,
-        uri = "http://localhost:8080/lang/python",
-        entity = HttpEntity(ContentTypes.`application/json`, ByteString(code.value))
-      )
+    // generate random code per 125 milliseconds
+    val generateRandomCode: Source[Code, Cancellable] = Source.tick(0.seconds, interval, NotUsed)
+      .map(_ => Code.random)
 
-      val now = Instant.now()
-      val requestId = randomId()
-      println(s"$actorSystem: sending Request($requestId, $code) at $now")
+    // send http request to remote code execution engine
+    val sendHttpRequest: Flow[Code, (Instant, Instant, String, Code), NotUsed] = Flow[Code]
+      .mapAsync(100) { code =>
+        val request = HttpRequest(
+          method = HttpMethods.POST,
+          uri = "http://localhost:8080/lang/python",
+          entity = HttpEntity(ContentTypes.`application/json`, ByteString(code.value))
+        )
 
-      http.singleRequest(request).map { response =>
-        val end = Instant.now()
-        val duration = ChronoUnit.MILLIS.between(now, end)
-        response.discardEntityBytes()
+        val now = Instant.now()
+        val requestId = randomId()
+        println(s"[$name]: sending Request($requestId, $code) at $now")
 
-        requestCount.incrementAndGet()
-        responseTimes.addAndGet(duration)
-        responseTimeDetails += duration
+        http.singleRequest(request).map { response =>
+          val end = Instant.now()
+          val duration = ChronoUnit.MILLIS.between(now, end)
+          response.discardEntityBytes()
 
-        (now, end, requestId, code)
-      }.recover {
-        case ex =>
-          println(s"[FAILURE]: ${ex.getMessage}")
-          errors.incrementAndGet()
-          (now, Instant.now(), requestId, code)
+          requestCount.incrementAndGet()
+          responseTimes.addAndGet(duration)
+          responseTimeDetails += duration
+
+          (now, end, requestId, code)
+        }.recover:
+          case ex =>
+            println(s"[$name] failed: ${ex.getMessage}")
+            errors.incrementAndGet()
+            (now, Instant.now(), requestId, code)
       }
-    }
 
-  val displayResponseTime: Sink[(Instant, Instant, String, Code), Future[Done]] =
-    Sink.foreach: (start, end, requestId, code) =>
-      val duration = ChronoUnit.MILLIS.between(start, end)
-      println(s"$actorSystem: received response for Request($requestId, $code) in $duration millis at: $end")
+    // display the http response time
+    val displayResponseTime: Sink[(Instant, Instant, String, Code), Future[Done]] =
+      Sink.foreach: (start, end, requestId, code) =>
+        val duration = ChronoUnit.MILLIS.between(start, end)
+        println(s"[$name]: received response for Request($requestId, $code) in $duration millis at: $end")
 
-  generateRandomCode
-    .via(sendHttpRequest)
-    .toMat(displayResponseTime)(Keep.right)
+    // join the stream
+    generateRandomCode
+      .via(sendHttpRequest)
+      .toMat(displayResponseTime)(Keep.right)
+  }
+
+  // run the stream
+  stream("simulator", 125.millis)
     .run()
 
   system.scheduler.scheduleWithFixedDelay(60.seconds, 60.seconds): () =>
@@ -90,6 +99,11 @@ object LoadTester extends App:
     println("-" * 50)
 
     responseTimeDetails.clear()
+
+  private def randInterval(): FiniteDuration =
+    Random
+      .shuffle(List.iterate(300.millis, 10)(_ + 25.millis))
+      .head
 
   private def randomId(): String =
     java.util.UUID.randomUUID()
@@ -113,7 +127,7 @@ object LoadTester extends App:
     case Instant         extends Code(Python.Instant)
 
   object Code:
-    def random: Code = Random.shuffle(Code.values.toSet).head
+    def random: Code = Random.shuffle(Code.values).head
 
   object Python:
     val MemoryIntensive =

@@ -32,7 +32,22 @@ object CodeExecutor:
       case In.Execute(compiler, file, replyTo) =>
         ctx.log.info(s"{}: executing submitted code", self)
         val asyncExecuted: Future[In.Executed] = for
-          ps <- run("timeout", "2", compiler, file.getName) // start process with 2 seconds timeout
+          // just copies file there
+          ps <- run(
+            "docker",
+            "run",
+            "--rm",
+            "--ulimit",
+            "cpu=1",
+            "--memory=10m",
+            "-v",
+            "engine:/data",
+            "-w",
+            "/data",
+            "python",
+            "python3",
+            s"/data/${file.getName}",
+          )
           (successSource, errorSource) = src(ps.getInputStream) -> src(ps.getErrorStream) // error and success channels as streams
           ((success, error), exitCode) <- successSource.runWith(ReadOutput) // join success, error and exitCode
             .zip(errorSource.runWith(ReadOutput))
@@ -48,9 +63,15 @@ object CodeExecutor:
           case Success(executed)  =>
             ctx.log.info("{}: executed submitted code", self)
             executed.exitCode match
-              case 124 => In.ExecutionFailed("The process was aborted because it exceeded the timeout", replyTo)
-              case 137 => In.ExecutionFailed("The process was aborted because it exceeded the memory usage", replyTo)
-              case _   => In.ExecutionSucceeded(executed.output, replyTo)
+              case 124       => In.ExecutionFailed("The process was aborted because it exceeded the timeout", replyTo)
+              case 137 | 139 => In.ExecutionFailed("The process was aborted because it exceeded the memory usage", replyTo)
+              case _         =>
+                val maxSize = 5 * 1024 * 1024
+                if (executed.output.getBytes("UTF-8").length > maxSize)
+                  In.ExecutionFailed("Too much memory", replyTo)
+                else
+                  In.ExecutionSucceeded(executed.output, replyTo)
+
           case Failure(exception) =>
             ctx.log.warn("{}: execution failed due to {}", self, exception.getMessage)
             In.ExecutionFailed(exception.getMessage, replyTo)

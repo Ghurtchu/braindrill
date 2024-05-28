@@ -63,14 +63,14 @@ object ClusterSystem:
               val asyncResponse = loadBalancer
                 .ask[ExecutionResult](StartExecution(code, lang, _))
                 .map(_.value)
-                .recover(_ => "something went wrong")
+                .recover(_ => "request timed out")
 
               complete(asyncResponse)
 
       val host = Try(cfg.getString("http.host")).getOrElse("0.0.0.0")
       val port = Try(cfg.getInt("http.port")).getOrElse(8080)
 
-      val deployHttpServer = Http()
+      Http()
         .newServerAt(host, port)
         .bind(route)
 
