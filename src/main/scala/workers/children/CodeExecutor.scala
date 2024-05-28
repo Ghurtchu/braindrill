@@ -18,9 +18,10 @@ object CodeExecutor:
   private val MegaByte = KiloByte * KiloByte // 1,048,576 bytes
   private val TwoMegabytes = 2 * MegaByte // 2,097,152 bytes
 
-  private val MaxSizeInBytes = TwoMegabytes // 2,097,152 bytes
+  private val AdjustedMaxSizeInBytes = (TwoMegabytes * 20) / 100 // 419,430 bytes, which is approx 409,6 KB or 0.4 MB
 
-  private val AdjustedMaxSizeInBytes = (MaxSizeInBytes * 20) / 100 // 419,430 bytes, which is approx 409,6 KB or 0.4 MB
+  // max size of output when the code is run, if it exceeds the limit then we let the user know to reduce logs or printing
+  private val MaxOutputSize = AdjustedMaxSizeInBytes
 
   enum In:
     case Execute(compiler: String, file: File, dockerImage: String, replyTo: ActorRef[Worker.In])
@@ -28,8 +29,8 @@ object CodeExecutor:
     case ExecutionFailed(why: String, replyTo: ActorRef[Worker.In])
     case ExecutionSucceeded(output: String, replyTo: ActorRef[Worker.In])
 
-  private case object UsingTooMuchMemory extends Throwable with NoStackTrace {
-    override def getMessage: String = "the process is using too much memory"
+  private case object TooLargeOutput extends Throwable with NoStackTrace {
+    override def getMessage: String = "the code is generating too large output, try reducing logs or printing"
   }
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
@@ -97,8 +98,8 @@ object CodeExecutor:
   private def readOutput(using ec: ExecutionContext): Sink[ByteString, Future[String]] =
     Sink.fold[String, ByteString]("")(_ + _.utf8String).mapMaterializedValue:
       _.flatMap: str =>
-        if str.length > AdjustedMaxSizeInBytes then
-          Future.failed(UsingTooMuchMemory)
+        if str.length > MaxOutputSize then
+          Future.failed(TooLargeOutput)
         else
           Future.successful(str)
 
