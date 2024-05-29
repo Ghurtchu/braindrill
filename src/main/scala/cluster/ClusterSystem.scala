@@ -15,13 +15,16 @@ import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import workers.Worker.*
 
-import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration.*
 import scala.util.*
 
 object ClusterSystem:
 
   def apply(): Behavior[Nothing] = Behaviors.setup[Nothing]: ctx =>
+
+    import ctx.executionContext
+
     val cluster = Cluster(ctx.system)
     val node = cluster.selfMember
     val cfg = ctx.system.settings.config
@@ -63,7 +66,7 @@ object ClusterSystem:
               val asyncResponse = loadBalancer
                 .ask[ExecutionResult](StartExecution(code, lang, _))
                 .map(_.value)
-                .recover(_ => "request timed out")
+                .recover(_ => "something went wrong")
 
               complete(asyncResponse)
 
@@ -74,7 +77,14 @@ object ClusterSystem:
         .newServerAt(host, port)
         .bind(route)
 
-      ctx.log.info("Server listening on {}", s"$host:$port")
+      ctx.log.info("Server is listening on {}:{}", host, port)
 
     Behaviors.empty[Nothing]
 
+
+  private def installDockerImages()(using ec: ExecutionContext) =
+    val commands = Worker.DockerImages.map: image =>
+      Array("docker", "image", "pull", image)
+
+    Future.traverse(commands): command =>
+      Future(sys.runtime.exec(command))

@@ -81,7 +81,7 @@ object Simulator extends App:
   // run the stream
   stream("simulator", 160.millis)
     .run()
-
+  
   system.scheduler.scheduleWithFixedDelay(60.seconds, 60.seconds): () =>
     val count = requestCount.getAndSet(0)
     val totalResponseTime = responseTimes.getAndSet(0)
