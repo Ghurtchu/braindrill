@@ -7,10 +7,11 @@ Video demo: https://www.youtube.com/watch?v=sMlJC7Kr330
 Requirements for deploying locally:
 - docker engine
 
-Running locally:
+Running locally (startup may be slow for the first time):
 - clone the project and navigate to the root directory
-- `docker volume create engine`
-- `docker-compose up`
+- start the docker engine
+- `chmod +x startup.sh`
+- `./startup.sh`
 
 Example:
 - sending `POST` request at `localhost:8080/lang/python`
