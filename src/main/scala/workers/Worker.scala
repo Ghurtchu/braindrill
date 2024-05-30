@@ -35,7 +35,12 @@ object Worker:
         compiler = "node",
         extension = ".js",
         dockerImage = "node"
-      )
+      ),
+      "ruby" -> LanguageSpecifics(
+        compiler = "ruby",
+        extension = ".ruby",
+        dockerImage = "ruby"
+      ),
     )
 
   sealed trait In

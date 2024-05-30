@@ -29,7 +29,7 @@ DOCKER_IMAGES=(
   "openjdk:17"
   "python"
   "node"
-  "rust"
+  "ruby"
 )
 
 # Pull Docker images in parallel if they don't already exist
