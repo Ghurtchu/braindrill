@@ -20,6 +20,9 @@ Running locally (startup may be slow for the first time since it needs to pull a
 - `chmod +x startup.sh`
 - `./startup.sh`
 
+In case you change code and want to run the new version you should execute:
+- `./startup.sh rebuild`
+
 Example:
 - sending `POST` request at `localhost:8080/lang/python`
 - attaching `python` code to request body

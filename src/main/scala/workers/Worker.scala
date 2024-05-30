@@ -21,9 +21,21 @@ object Worker:
 
   private val languageSpecifics: Map[String, LanguageSpecifics] =
     Map(
-      "java" -> LanguageSpecifics("java", ".java", "openjdk:17"),
-      "python" -> LanguageSpecifics("python3", ".py", "python"),
-      "javascript" -> LanguageSpecifics("node", ".js", "node")
+      "java" -> LanguageSpecifics(
+        compiler = "java",
+        extension = ".java",
+        dockerImage = "openjdk:17"
+      ),
+      "python" -> LanguageSpecifics(
+        compiler = "python3",
+        extension = ".py",
+        dockerImage = "python"
+      ),
+      "javascript" -> LanguageSpecifics(
+        compiler = "node",
+        extension = ".js",
+        dockerImage = "node"
+      )
     )
 
   sealed trait In

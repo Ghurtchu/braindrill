@@ -46,6 +46,7 @@ object CodeExecutor:
       case In.Execute(compiler, file, dockerImage, replyTo) =>
         ctx.log.info(s"{}: executing submitted code", self)
         val asyncExecuted: Future[In.Executed] = for
+          // timeout --signal=SIGKILL 2 docker run --rm --ulimit cpu=1 --memory=20m -v engine:/data -w /data rust rust /data/r.rust
           ps <- run(
             "timeout",
             "--signal=SIGKILL",
