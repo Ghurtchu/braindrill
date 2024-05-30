@@ -15,7 +15,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.Random
+import scala.util.Random.shuffle
 
 object Simulator extends App:
 
@@ -100,11 +100,6 @@ object Simulator extends App:
 
     responseTimeDetails.clear()
 
-  private def randInterval(): FiniteDuration =
-    Random
-      .shuffle(List.iterate(300.millis, 10)(_ + 25.millis))
-      .head
-
   private def randomId(): String =
     java.util.UUID.randomUUID()
       .toString
@@ -122,12 +117,12 @@ object Simulator extends App:
   enum Code(val value: String):
     case MemoryIntensive extends Code(Python.MemoryIntensive)
     case CPUIntensive    extends Code(Python.CPUIntensive)
-    case Medium          extends Code(Python.Medium)
+    case Random          extends Code(Python.Random)
     case Simple          extends Code(Python.Simple)
     case Instant         extends Code(Python.Instant)
 
   object Code:
-    def random: Code = Random.shuffle(Code.values).head
+    def random: Code = shuffle(Code.values).head
 
   object Python:
     val MemoryIntensive =
@@ -149,7 +144,7 @@ object Simulator extends App:
         |print(cpu_intensive_task(50))
         |""".stripMargin
 
-    val Medium =
+    val Random =
       """import random
         |
         |# Initialize the stop variable to False
@@ -169,7 +164,7 @@ object Simulator extends App:
 
     val Simple =
       """
-        |for i in range(1, 100):
+        |for i in range(1, 500):
         |    print("number: " + str(i))
         |""".stripMargin
 
