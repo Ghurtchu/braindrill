@@ -17,11 +17,11 @@ Requirements for deploying locally:
 Running locally (startup may be slow for the first time since it needs to pull a few docker images):
 - clone the project and navigate to the root directory
 - start the docker engine
-- `chmod +x startup.sh`
-- `./startup.sh`
+- `chmod +x deploy.sh`
+- `./deploy.sh`
 
 In case you change code and want to run the new version you should execute:
-- `./startup.sh rebuild`
+- `./deploy.sh rebuild`
 
 Example:
 - sending `POST` request at `localhost:8080/lang/python`
