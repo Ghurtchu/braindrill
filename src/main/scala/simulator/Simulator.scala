@@ -33,7 +33,8 @@ object Simulator extends App:
   def stream(name: String, interval: FiniteDuration) = {
 
     // generate random code per 125 milliseconds
-    val generateRandomCode: Source[Code, Cancellable] = Source.tick(0.seconds, interval, NotUsed)
+    val generateRandomCode: Source[Code, Cancellable] = Source
+      .tick(0.seconds, interval, NotUsed)
       .map(_ => Code.random)
 
     // send http request to remote code execution engine
@@ -45,32 +46,36 @@ object Simulator extends App:
           entity = HttpEntity(ContentTypes.`application/json`, ByteString(code.value))
         )
 
-        val now = Instant.now()
-        val requestId = randomId()
+        val (now, requestId) = (Instant.now(), randomId())
         println(s"[$name]: sending Request($requestId, $code) at $now")
 
-        http.singleRequest(request).map { response =>
-          val end = Instant.now()
-          val duration = ChronoUnit.MILLIS.between(now, end)
-          response.discardEntityBytes()
+        http
+          .singleRequest(request)
+          .map { response =>
+            val end = Instant.now()
+            val duration = ChronoUnit.MILLIS.between(now, end)
+            response.discardEntityBytes()
 
-          requestCount.incrementAndGet()
-          responseTimes.addAndGet(duration)
-          responseTimeDetails += duration
+            requestCount.incrementAndGet()
+            responseTimes.addAndGet(duration)
+            responseTimeDetails += duration
 
-          (now, end, requestId, code)
-        }.recover:
-          case ex =>
-            println(s"[$name] failed: ${ex.getMessage}")
-            errors.incrementAndGet()
-            (now, Instant.now(), requestId, code)
+            (now, end, requestId, code)
+          }
+          .recover:
+            case ex =>
+              println(s"[$name] failed: ${ex.getMessage}")
+              errors.incrementAndGet()
+              (now, Instant.now(), requestId, code)
       }
 
     // display the http response time
     val displayResponseTime: Sink[(Instant, Instant, String, Code), Future[Done]] =
       Sink.foreach: (start, end, requestId, code) =>
         val duration = ChronoUnit.MILLIS.between(start, end)
-        println(s"[$name]: received response for Request($requestId, $code) in $duration millis at: $end")
+        println(
+          s"[$name]: received response for Request($requestId, $code) in $duration millis at: $end"
+        )
 
     // join the stream
     generateRandomCode
@@ -81,7 +86,7 @@ object Simulator extends App:
   // run the stream
   stream("simulator", 160.millis)
     .run()
-  
+
   system.scheduler.scheduleWithFixedDelay(60.seconds, 60.seconds): () =>
     val count = requestCount.getAndSet(0)
     val totalResponseTime = responseTimes.getAndSet(0)
@@ -101,7 +106,8 @@ object Simulator extends App:
     responseTimeDetails.clear()
 
   private def randomId(): String =
-    java.util.UUID.randomUUID()
+    java.util.UUID
+      .randomUUID()
       .toString
       .replace("-", "")
       .substring(1, 10)
@@ -116,10 +122,10 @@ object Simulator extends App:
 
   enum Code(val value: String):
     case MemoryIntensive extends Code(Python.MemoryIntensive)
-    case CPUIntensive    extends Code(Python.CPUIntensive)
-    case Random          extends Code(Python.Random)
-    case Simple          extends Code(Python.Simple)
-    case Instant         extends Code(Python.Instant)
+    case CPUIntensive extends Code(Python.CPUIntensive)
+    case Random extends Code(Python.Random)
+    case Simple extends Code(Python.Simple)
+    case Instant extends Code(Python.Instant)
 
   object Code:
     def random: Code = shuffle(Code.values).head
@@ -169,4 +175,3 @@ object Simulator extends App:
         |""".stripMargin
 
     val Instant = "print('hello world')"
-

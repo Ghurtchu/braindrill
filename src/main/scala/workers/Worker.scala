@@ -13,25 +13,32 @@ object Worker:
 
   val WorkerRouterKey = ServiceKey[Worker.StartExecution]("worker-router.StartExecution")
 
-  private final case class LanguageSpecifics(compiler: String, extension: String, dockerImage: String)
+  private final case class LanguageSpecifics(
+      compiler: String,
+      extension: String,
+      dockerImage: String
+  )
 
   private val languageSpecifics: Map[String, LanguageSpecifics] =
     Map(
       "java" -> LanguageSpecifics("java", ".java", "openjdk:17"),
       "python" -> LanguageSpecifics("python3", ".py", "python"),
-      "javascript" -> LanguageSpecifics("node", ".js", "node"),
+      "javascript" -> LanguageSpecifics("node", ".js", "node")
     )
 
-  val DockerImages = languageSpecifics.values.map(_.dockerImage).toSeq
-
   sealed trait In
-  final case class StartExecution(code: String, language: String, replyTo: ActorRef[Worker.ExecutionResult]) extends In with CborSerializable
+  final case class StartExecution(
+      code: String,
+      language: String,
+      replyTo: ActorRef[Worker.ExecutionResult]
+  ) extends In
+      with CborSerializable
 
   sealed trait ExecutionResult extends In:
     def value: String
 
   final case class ExecutionSucceeded(value: String) extends ExecutionResult with CborSerializable
-  final case class ExecutionFailed(value: String)    extends ExecutionResult with CborSerializable
+  final case class ExecutionFailed(value: String) extends ExecutionResult with CborSerializable
 
   def apply(workerRouter: Option[ActorRef[Worker.ExecutionResult]] = None): Behavior[In] =
     Behaviors.setup[In]: ctx =>
@@ -46,7 +53,8 @@ object Worker:
               ctx.log.info(s"{} sending PrepareFile to {}", self, fileHandler)
 
               fileHandler ! FileHandler.In.PrepareFile(
-                name = s"$lang${Random.nextInt}${specifics.extension}", // random number for avoiding file overwrite/shadowing
+                name =
+                  s"$lang${Random.nextInt}${specifics.extension}", // random number for avoiding file overwrite/shadowing
                 compiler = specifics.compiler,
                 dockerImage = specifics.dockerImage,
                 code = code,
@@ -72,4 +80,3 @@ object Worker:
           workerRouter.foreach(_ ! msg)
 
           apply(workerRouter = None)
-

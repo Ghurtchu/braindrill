@@ -14,7 +14,7 @@ I tried it all and decided to use the DooD approach by mounting docker.sock to a
 Requirements for deploying locally:
 - docker engine
 
-Running locally (startup may be slow for the first time):
+Running locally (startup may be slow for the first time since it needs to pull a few docker images):
 - clone the project and navigate to the root directory
 - start the docker engine
 - `chmod +x startup.sh`

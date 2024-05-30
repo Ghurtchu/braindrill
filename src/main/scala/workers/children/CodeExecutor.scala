@@ -18,7 +18,8 @@ object CodeExecutor:
   private val MegaByte = KiloByte * KiloByte // 1,048,576 bytes
   private val TwoMegabytes = 2 * MegaByte // 2,097,152 bytes
 
-  private val AdjustedMaxSizeInBytes = (TwoMegabytes * 20) / 100 // 419,430 bytes, which is approx 409,6 KB or 0.4 MB
+  private val AdjustedMaxSizeInBytes =
+    (TwoMegabytes * 20) / 100 // 419,430 bytes, which is approx 409,6 KB or 0.4 MB
 
   // max size of output when the code is run, if it exceeds the limit then we let the user know to reduce logs or printing
   private val MaxOutputSize = AdjustedMaxSizeInBytes
@@ -30,7 +31,8 @@ object CodeExecutor:
     case ExecutionSucceeded(output: String, replyTo: ActorRef[Worker.In])
 
   private case object TooLargeOutput extends Throwable with NoStackTrace {
-    override def getMessage: String = "the code is generating too large output, try reducing logs or printing"
+    override def getMessage: String =
+      "the code is generating too large output, try reducing logs or printing"
   }
 
   def apply() = Behaviors.receive[In]: (ctx, msg) =>
@@ -60,10 +62,13 @@ object CodeExecutor:
             "/data",
             dockerImage,
             compiler,
-            s"${file.getPath}",
+            s"${file.getPath}"
           )
-          (successSource, errorSource) = src(ps.getInputStream) -> src(ps.getErrorStream) // error and success channels as streams
-          ((success, error), exitCode) <- successSource.runWith(readOutput) // join success, error and exitCode
+          (successSource, errorSource) = src(ps.getInputStream) -> src(
+            ps.getErrorStream
+          ) // error and success channels as streams
+          ((success, error), exitCode) <- successSource
+            .runWith(readOutput) // join success, error and exitCode
             .zip(errorSource.runWith(readOutput))
             .zip(Future(ps.waitFor))
           _ = Future(file.delete) // remove file in the background to free up the memory
@@ -74,12 +79,20 @@ object CodeExecutor:
         )
 
         ctx.pipeToSelf(asyncExecuted):
-          case Success(executed)  =>
+          case Success(executed) =>
             ctx.log.info("{}: executed submitted code", self)
             executed.exitCode match
-              case 124 | 137 => In.ExecutionFailed("The process was aborted because it exceeded the timeout", replyTo)
-              case 139       => In.ExecutionFailed("The process was aborted because it exceeded the memory usage", replyTo)
-              case _         => In.ExecutionSucceeded(executed.output, replyTo)
+              case 124 | 137 =>
+                In.ExecutionFailed(
+                  "The process was aborted because it exceeded the timeout",
+                  replyTo
+                )
+              case 139 =>
+                In.ExecutionFailed(
+                  "The process was aborted because it exceeded the memory usage",
+                  replyTo
+                )
+              case _ => In.ExecutionSucceeded(executed.output, replyTo)
           case Failure(exception) =>
             ctx.log.warn("{}: execution failed due to {}", self, exception.getMessage)
             In.ExecutionFailed(exception.getMessage, replyTo)
@@ -93,18 +106,18 @@ object CodeExecutor:
         Behaviors.stopped
 
       case In.ExecutionFailed(why, replyTo) =>
-        ctx.log.warn(s"{}: execution failed due to {}", self ,why)
+        ctx.log.warn(s"{}: execution failed due to {}", self, why)
         replyTo ! Worker.ExecutionFailed(why)
 
         Behaviors.stopped
 
   private def readOutput(using ec: ExecutionContext): Sink[ByteString, Future[String]] =
-    Sink.fold[String, ByteString]("")(_ + _.utf8String).mapMaterializedValue:
-      _.flatMap: str =>
-        if str.length > MaxOutputSize then
-          Future failed TooLargeOutput
-        else
-          Future successful str
+    Sink
+      .fold[String, ByteString]("")(_ + _.utf8String)
+      .mapMaterializedValue:
+        _.flatMap: str =>
+          if str.length > MaxOutputSize then Future failed TooLargeOutput
+          else Future successful str
 
   private def src(stream: => InputStream): Source[ByteString, Future[IOResult]] =
     StreamConverters.fromInputStream(() => stream)

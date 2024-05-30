@@ -33,10 +33,13 @@ object ClusterSystem:
       val numberOfWorkers = Try(cfg.getInt("transformation.workers-per-node")).getOrElse(50)
       // actor that sends StartExecution message to local Worker actors in a round robin fashion
       val workerRouter = ctx.spawn(
-        behavior = Routers.pool(numberOfWorkers) {
-          Behaviors.supervise(Worker().narrow[StartExecution])
-            .onFailure(SupervisorStrategy.restart)
-        } .withRoundRobinRouting(),
+        behavior = Routers
+          .pool(numberOfWorkers) {
+            Behaviors
+              .supervise(Worker().narrow[StartExecution])
+              .onFailure(SupervisorStrategy.restart)
+          }
+          .withRoundRobinRouting(),
         name = "worker-router"
       )
       // actors are registered to the ActorSystem receptionist using a special ServiceKey.
@@ -54,7 +57,10 @@ object ClusterSystem:
       // pool of load balancers that forward StartExecution message to the remote worker-router actors in a round robin fashion
       val loadBalancers = (1 to numberOfLoadBalancers).map: n =>
         ctx.spawn(
-          behavior = Routers.group(Worker.WorkerRouterKey).withRoundRobinRouting(), // routes StartExecution message to the remote worker-router
+          behavior =
+            Routers
+              .group(Worker.WorkerRouterKey)
+              .withRoundRobinRouting(), // routes StartExecution message to the remote worker-router
           name = s"load-balancer-$n"
         )
 
@@ -80,11 +86,3 @@ object ClusterSystem:
       ctx.log.info("Server is listening on {}:{}", host, port)
 
     Behaviors.empty[Nothing]
-
-
-  private def installDockerImages()(using ec: ExecutionContext) =
-    val commands = Worker.DockerImages.map: image =>
-      Array("docker", "image", "pull", image)
-
-    Future.traverse(commands): command =>
-      Future(sys.runtime.exec(command))

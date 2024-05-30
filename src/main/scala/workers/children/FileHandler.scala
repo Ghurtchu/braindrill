@@ -12,61 +12,72 @@ import java.nio.file.Path
 import scala.concurrent.Future
 import scala.util.*
 
-
 object FileHandler:
 
   enum In:
-    case PrepareFile(name: String, code: String, compiler: String, dockerImage: String, replyTo: ActorRef[Worker.In])
-    case FilePrepared(compiler: String, file: File, dockerImage: String, replyTo: ActorRef[Worker.In])
+    case PrepareFile(
+        name: String,
+        code: String,
+        compiler: String,
+        dockerImage: String,
+        replyTo: ActorRef[Worker.In]
+    )
+    case FilePrepared(
+        compiler: String,
+        file: File,
+        dockerImage: String,
+        replyTo: ActorRef[Worker.In]
+    )
     case FilePreparationFailed(why: String, replyTo: ActorRef[Worker.In])
 
-  def apply() = Behaviors.receive[In]: (ctx, msg) =>
-    import CodeExecutor.In.*
-    import ctx.executionContext
-    import ctx.system
+  def apply() = Behaviors
+    .receive[In]: (ctx, msg) =>
+      import CodeExecutor.In.*
+      import ctx.executionContext
+      import ctx.system
 
-    val self = ctx.self
+      val self = ctx.self
 
-    ctx.log.info(s"{}: processing {}", self, msg)
+      ctx.log.info(s"{}: processing {}", self, msg)
 
-    msg match
-      case In.PrepareFile(name, code, compiler, dockerImage, replyTo) =>
-        val filepath = s"/data/$name"
-        val asyncFile = for
-          file <- Future(File(filepath))
-          _    <- Source.single(code)
-            .map(ByteString.apply)
-            .runWith(FileIO.toPath(Path.of(filepath)))
-        yield file
+      msg match
+        case In.PrepareFile(name, code, compiler, dockerImage, replyTo) =>
+          val filepath = s"/data/$name"
+          val asyncFile = for
+            file <- Future(File(filepath))
+            _ <- Source
+              .single(code)
+              .map(ByteString.apply)
+              .runWith(FileIO.toPath(Path.of(filepath)))
+          yield file
 
-        ctx.pipeToSelf(asyncFile):
-          case Success(file) => In.FilePrepared(compiler, file, dockerImage, replyTo)
-          case Failure(why)  => In.FilePreparationFailed(why.getMessage, replyTo)
+          ctx.pipeToSelf(asyncFile):
+            case Success(file) => In.FilePrepared(compiler, file, dockerImage, replyTo)
+            case Failure(why)  => In.FilePreparationFailed(why.getMessage, replyTo)
 
-        Behaviors.same
+          Behaviors.same
 
-      case In.FilePrepared(compiler, file, dockerImage, replyTo) =>
-        val codeExecutor = ctx.spawn(CodeExecutor(), "code-executor")
-        // observe child for self-destruction
-        ctx.watch(codeExecutor)
-        ctx.log.info("{} prepared file, sending Execute to {}", self, codeExecutor)
-        codeExecutor ! Execute(compiler, file, dockerImage, replyTo)
+        case In.FilePrepared(compiler, file, dockerImage, replyTo) =>
+          val codeExecutor = ctx.spawn(CodeExecutor(), "code-executor")
+          // observe child for self-destruction
+          ctx.watch(codeExecutor)
+          ctx.log.info("{} prepared file, sending Execute to {}", self, codeExecutor)
+          codeExecutor ! Execute(compiler, file, dockerImage, replyTo)
 
-        Behaviors.same
+          Behaviors.same
 
-      case In.FilePreparationFailed(why, replyTo) =>
-        ctx.log.warn(
-          "{} failed during file preparation due to {}, sending ExecutionFailed to {}",
-          self,
-          why,
-          replyTo
-        )
-        replyTo ! Worker.ExecutionFailed(why)
+        case In.FilePreparationFailed(why, replyTo) =>
+          ctx.log.warn(
+            "{} failed during file preparation due to {}, sending ExecutionFailed to {}",
+            self,
+            why,
+            replyTo
+          )
+          replyTo ! Worker.ExecutionFailed(why)
+
+          Behaviors.stopped
+    .receiveSignal:
+      case (ctx, Terminated(ref)) =>
+        ctx.log.info(s"{} is stopping because child actor: {} was stopped", ctx.self, ref)
 
         Behaviors.stopped
-
-  .receiveSignal:
-    case (ctx, Terminated(ref)) =>
-      ctx.log.info(s"{} is stopping because child actor: {} was stopped", ctx.self, ref)
-
-      Behaviors.stopped
