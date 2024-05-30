@@ -45,6 +45,9 @@ object CodeExecutor:
         ctx.log.info(s"{}: executing submitted code", self)
         val asyncExecuted: Future[In.Executed] = for
           ps <- run(
+            "timeout",
+            "--signal=SIGKILL",
+            "2", // 2 second timeout which sends SIGKILL if exceeded
             "docker",
             "run",
             "--rm", // remove the container when it's done
@@ -74,9 +77,9 @@ object CodeExecutor:
           case Success(executed)  =>
             ctx.log.info("{}: executed submitted code", self)
             executed.exitCode match
-              case 124       => In.ExecutionFailed("The process was aborted because it exceeded the timeout", replyTo)
-              case 137 | 139 => In.ExecutionFailed("The process was aborted because it exceeded the memory usage", replyTo)
-              case _ => In.ExecutionSucceeded(executed.output, replyTo)
+              case 124 | 137 => In.ExecutionFailed("The process was aborted because it exceeded the timeout", replyTo)
+              case 139       => In.ExecutionFailed("The process was aborted because it exceeded the memory usage", replyTo)
+              case _         => In.ExecutionSucceeded(executed.output, replyTo)
           case Failure(exception) =>
             ctx.log.warn("{}: execution failed due to {}", self, exception.getMessage)
             In.ExecutionFailed(exception.getMessage, replyTo)
@@ -99,9 +102,9 @@ object CodeExecutor:
     Sink.fold[String, ByteString]("")(_ + _.utf8String).mapMaterializedValue:
       _.flatMap: str =>
         if str.length > MaxOutputSize then
-          Future.failed(TooLargeOutput)
+          Future failed TooLargeOutput
         else
-          Future.successful(str)
+          Future successful str
 
   private def src(stream: => InputStream): Source[ByteString, Future[IOResult]] =
     StreamConverters.fromInputStream(() => stream)
