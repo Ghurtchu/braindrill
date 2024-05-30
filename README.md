@@ -1,8 +1,15 @@
 # Distributed Remote Code Execution Engine
 
-Drill your brain, because why the heck not.
+Send code, we will run it :)
 
 Video demo: https://www.youtube.com/watch?v=sMlJC7Kr330
+
+There are multiple ways to execute the client code:
+- run it on bare machine
+- run it within the running docker container that also wraps the running app itself
+- run it in a "sibling" short-lived containers (DooD - docker out of docker)
+
+I tried it all and decided to use the DooD approach by mounting docker.sock to app containers so that docker engine can be accesed within the running container.
 
 Requirements for deploying locally:
 - docker engine
