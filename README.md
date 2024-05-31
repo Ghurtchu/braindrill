@@ -29,16 +29,8 @@ Example:
 
 ![My Image](assets/python_example.png)
 
-Supported programming languages and their respective HTTP paths
+Supported programming languages, their respective HTTP paths and simple code snippets for testing:
 - `Java` - `localhost:8080/lang/java`
-- `Python` - `localhost:8080/lang/python`
-- `Ruby` - `localhost:8080/lang/ruby`
-- `Perl` - `localhost:8080/lang/perl`
-- `JavaScript` - `localhost:8080/lang/javascript`
-
-Simple code snippets for testing:
-
-- `Java`
 ```java
 public class BrainDrill {
     public static void main(String[] args) {
@@ -47,22 +39,22 @@ public class BrainDrill {
 }
 ```
 
-- `Python`
+- `Python` - `localhost:8080/lang/python`
 ```python
 print("drill my brain") 
 ```
 
-- `Ruby`
+- `Ruby` - `localhost:8080/lang/ruby`
 ```ruby
 puts "drill my brain" 
 ```
 
-- `Perl`
+- `Perl` - `localhost:8080/lang/perl`
 ```perl
 print "drill my brain\n"; 
 ```
 
-- `JavaScript`:
+- `JavaScript` - `localhost:8080/lang/javascript`
 ```javascript
 console.log("drill my brain");
 ```
