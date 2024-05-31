@@ -30,6 +30,7 @@ DOCKER_IMAGES=(
   "python"
   "node"
   "ruby"
+  "perl"
 )
 
 # Pull Docker images in parallel if they don't already exist

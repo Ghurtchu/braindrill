@@ -33,6 +33,7 @@ Supported programming languages:
 - `Java 17`: `localhost:8080/lang/java`
 - `Python 3`: `localhost:8080/lang/python`
 - `Ruby`: `localhost:8080/lang/ruby`
+- `Perl`: `localhost:8080/lang/perl`
 - `JavaScript / Node 16`: `localhost:8080/lang/javascript`
 
 Simple code snippets for testing:
@@ -54,6 +55,11 @@ print("drill my brain")
 - `Ruby`
 ```ruby
 puts "drill my brain" 
+```
+
+- `Perl`
+```perl
+print "drill my brain\n"; 
 ```
 
 - `JavaScript`:
