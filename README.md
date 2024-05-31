@@ -29,7 +29,7 @@ Example:
 
 ![My Image](assets/python_example.png)
 
-Supported programming languages, their respective HTTP paths and simple code snippets for testing:
+Supported programming languages, HTTP paths and simple code snippets for request body, respectively:
 - `Java` - `localhost:8080/lang/java`
 ```java
 public class BrainDrill {
