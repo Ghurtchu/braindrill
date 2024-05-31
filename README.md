@@ -30,11 +30,11 @@ Example:
 ![My Image](assets/python_example.png)
 
 Supported programming languages:
-- `Java 17`: `localhost:8080/lang/java`
-- `Python 3`: `localhost:8080/lang/python`
+- `Java`: `localhost:8080/lang/java`
+- `Python`: `localhost:8080/lang/python`
 - `Ruby`: `localhost:8080/lang/ruby`
 - `Perl`: `localhost:8080/lang/perl`
-- `JavaScript / Node 16`: `localhost:8080/lang/javascript`
+- `JavaScript`: `localhost:8080/lang/javascript`
 
 Simple code snippets for testing:
 
