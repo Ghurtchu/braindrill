@@ -31,16 +31,21 @@ object Worker:
         extension = ".py",
         dockerImage = "python"
       ),
-      "javascript" -> LanguageSpecifics(
-        compiler = "node",
-        extension = ".js",
-        dockerImage = "node"
-      ),
       "ruby" -> LanguageSpecifics(
         compiler = "ruby",
         extension = ".ruby",
         dockerImage = "ruby"
       ),
+      "perl" -> LanguageSpecifics(
+        compiler = "perl",
+        extension = ".pl",
+        dockerImage = "perl"
+      ),
+      "javascript" -> LanguageSpecifics(
+        compiler = "node",
+        extension = ".js",
+        dockerImage = "node"
+      )
     )
 
   sealed trait In
