@@ -52,6 +52,13 @@ print "drill my brain\n";
 console.log("drill my brain");
 ```
 
+- `PHP` - `localhost:8080/lang/php`
+```javascript
+<?php
+echo "drill my brain";
+?>
+```
+
 Architecture Diagram:
 
 ![My Image](assets/diagram.png)
