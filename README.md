@@ -59,25 +59,12 @@ print "drill my brain\n";
 console.log("drill my brain");
 ```
 
-DONE:
-- implement POC - ✅
-- introduce http layer (pekko-http) - ✅
-- introduce local master and worker pekko actors - ✅
-- introduce Pekko Cluster - ✅
-- turn local master actor into load balancer node - ✅
-- create 3 worker nodes - ✅
-- distribute worker actors equally on each node (e.g 25 actors on each node, awaiting tasks) - ✅
-- run cluster via docker-compose - ✅ 
-- implement timeouts & cleanup for long-running code, limit CPU and RAM, add secure layer - ✅
-- write basic load test to check how system behaves during high load - ✅
-- perform aggregation statistics in load test - ✅
+Architecture Diagram:
+
+![My Image](assets/diagram.png)
 
 TODO:
 - add support for C, Go, Rust and others - ❌
 - use other `pekko` libraries to make cluster bootstrapping and management flexible and configurable - ❌
 - wrap the cluster in k8s and enable autoscaling - ❌
 - deploy two separate clusters and enable `RoundRobin` load balancing via k8s - ❌
-
-Architecture Diagram:
-
-![My Image](assets/diagram.png)
