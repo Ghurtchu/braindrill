@@ -45,6 +45,11 @@ object Worker:
         compiler = "node",
         extension = ".js",
         dockerImage = "node"
+      ),
+      "php" -> LanguageSpecifics(
+        compiler = "php",
+        extension = ".php",
+        dockerImage = "php"
       )
     )
 
