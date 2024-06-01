@@ -67,4 +67,3 @@ TODO:
 - add support for C, Go, Rust and others - ❌
 - use other `pekko` libraries to make cluster bootstrapping and management flexible and configurable - ❌
 - wrap the cluster in k8s and enable autoscaling - ❌
-- deploy two separate clusters and enable `RoundRobin` load balancing via k8s - ❌
