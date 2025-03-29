@@ -1,2 +1,50 @@
 # Ignore JetBrains IDE settings
 .idea/
+
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build files
+dist/
+build/
+
+# Editor settings
+.vscode/
+.idea/
+*.sublime-workspace
+
+# Logs
+logs
+*.log
+yarn-debug.log*
+yarn-error.log*
+
+# MacOS system files
+.DS_Store
+
+# Optional: Ignore TypeScript build files
+*.tsbuildinfo
+
+../.idea
+.bsp
+.vscode
+.bloop
+.history
+.metals
+metals.sbt
+/project/*.conf
+.DS_Store
+target/
+project/target/
+
+logs/
