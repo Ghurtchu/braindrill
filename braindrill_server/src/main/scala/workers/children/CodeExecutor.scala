@@ -50,7 +50,7 @@ object CodeExecutor:
           ps <- run(
             "timeout",
             "--signal=SIGKILL",
-            "2", // 2 second timeout which sends SIGKILL if exceeded
+            "3", // 2 second timeout which sends SIGKILL if exceeded
             "docker",
             "run",
             "--rm", // remove the container when it's done
